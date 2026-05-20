@@ -1,0 +1,8 @@
+id,name,model_id/id,group_id/id,perm_read,perm_write,perm_create,perm_unlink
+access_amazon_dashboard_group_user,access.amazon.dashboard.group.user,model_amazon_dashboard,base.group_user,1,1,1,1
+access_amazon_upload_file_group_user,access.amazon.upload.file.group.user,model_amazon_upload_file,base.group_user,1,1,1,1
+access_ir_attachment_group_user,access.ir.attachment.group.user,model_ir_attachment,base.group_user,1,1,1,1
+access_aws_permission_helper_group_user,access.aws.permission.helper.group.user,model_aws_permission_helper,base.group_user,1,1,1,1
+access_google_drive_dashboard_group_user,access.google.drive.dashboard.group.user,model_google_drive_dashboard,base.group_user,1,1,1,1
+access_google_drive_upload_file_group_user,access.google.drive.upload.file.group.user,model_google_drive_upload_file,base.group_user,1,1,1,1
+access_cloud_connector_rule,cloud.connector.rule,model_cloud_connector_rule,base.group_system,1,1,1,1

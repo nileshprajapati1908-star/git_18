@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <record id="view_aws_permission_helper_form" model="ir.ui.view">
+        <field name="name">aws.permission.helper.form</field>
+        <field name="model">aws.permission.helper</field>
+        <field name="arch" type="xml">
+            <form string="Amazon S3 Permission Helper">
+                <sheet class="o_cloud_permission_helper">
+
+                    <div class="alert alert-info mb-4">
+                        Follow these steps in AWS Console:
+                    </div>
+
+                    <!-- STEP 1 - IAM POLICY -->
+                    <div class="o_step_block mb-4">
+                        <div class="o_step_row">
+                            <div class="o_step_left">
+                                <h6 class="o_step_title">STEP 1 - IAM POLICY</h6>
+                                <p class="o_step_text">
+                                    Go to AWS Console &gt; IAM &gt; Users &gt; your user &gt;
+                                    Permissions &gt; Add permissions &gt; Create inline policy.
+                                    Switch to the JSON tab, replace the content with the IAM
+                                    policy JSON below, then click Next. Name it
+                                    <code class="o_step_code">odoo-s3-policy</code>
+                                    and create the policy.
+                                </p>
+                            </div>
+                            <div class="o_step_right">
+                                <field name="iam_policy_json"
+                                       nolabel="1"
+                                       readonly="1"
+                                       class="o_json_field w-100"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="o_step_divider"/>
+
+                    <!-- STEP 2 - BUCKET CORS -->
+                    <div class="o_step_block mb-4">
+                        <div class="o_step_row">
+                            <div class="o_step_left">
+                                <h6 class="o_step_title">STEP 2 - BUCKET CORS</h6>
+                                <p class="o_step_text">
+                                    Go to AWS Console &gt; S3 &gt; Buckets &gt; your bucket &gt;
+                                    Permissions. Open Cross-origin resource sharing (CORS) &gt;
+                                    Edit, paste the following CORS configuration, then save changes.
+                                </p>
+                            </div>
+                            <div class="o_step_right">
+                                <field name="cors_json"
+                                       nolabel="1"
+                                       readonly="1"
+                                       class="o_json_field w-100"/>
+                            </div>
+                        </div>
+                    </div>
+
+                </sheet>
+
+                <footer>
+                    <button name="action_reload_payloads"
+                            type="object"
+                            string="Refresh JSON"
+                            class="btn btn-secondary"/>
+                    <button string="Close"
+                            special="cancel"
+                            class="btn btn-primary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

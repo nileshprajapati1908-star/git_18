@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Set maximum file upload size to 2 GB (merged from fix_chatter_large_file_upload) -->
+        <record id="web_max_file_upload_size" model="ir.config_parameter">
+            <field name="key">web.max_file_upload_size</field>
+            <field name="value">5368709120</field>
+        </record>
+    </data>
+</odoo>

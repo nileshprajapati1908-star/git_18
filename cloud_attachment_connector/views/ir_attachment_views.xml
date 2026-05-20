@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <!-- Add S3 fields to attachment form view -->
+    <record id="view_attachment_form_inherit_s3" model="ir.ui.view">
+        <field name="name">ir.attachment.form.inherit.s3</field>
+        <field name="model">ir.attachment</field>
+        <field name="inherit_id" ref="base.view_attachment_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='datas']" position="after">
+                <group string="S3 Information" invisible="not is_s3_attachment">
+                    <field name="is_s3_attachment" invisible="1"/>
+                    <field name="s3_key" readonly="1"/>
+                    <field name="s3_url" string="S3 URL" readonly="1" widget="url"/>
+                    <button name="action_open_s3_object" type="object" string="Open Object URL" class="btn-link"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Add S3 column to attachment tree view -->
+    <record id="view_attachment_tree_inherit_s3" model="ir.ui.view">
+        <field name="name">ir.attachment.tree.inherit.s3</field>
+        <field name="model">ir.attachment</field>
+        <field name="inherit_id" ref="base.view_attachment_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="is_s3_attachment" string="S3" widget="boolean_toggle"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Add filter for S3 attachments in attachment search view -->
+    <record id="view_attachment_filter_inherit_s3" model="ir.ui.view">
+        <field name="name">ir.attachment.filter.inherit.s3</field>
+        <field name="model">ir.attachment</field>
+        <field name="inherit_id" ref="base.view_attachment_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='my_documents_filter']" position="after">
+                <filter string="Stored on S3" name="s3_attachments" domain="[('is_s3_attachment', '=', True)]"/>
+                <separator/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

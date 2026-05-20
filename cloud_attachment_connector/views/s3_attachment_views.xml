@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <!-- Search view for S3 Attachments -->
+    <record id="view_s3_attachment_search" model="ir.ui.view">
+        <field name="name">ir.attachment.search.s3</field>
+        <field name="model">ir.attachment</field>
+        <field name="arch" type="xml">
+            <search string="S3 Attachments">
+                <filter string="Stored on S3" name="s3_attachments" domain="[('is_s3_attachment', '=', True)]"/>
+                <filter string="Chatter Attachments" name="chatter_attachments" domain="[('is_s3_attachment', '=', True), ('res_model', '!=', False), ('res_id', '!=', 0)]"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action for S3 Attachments -->
+    <record id="action_s3_attachments" model="ir.actions.act_window">
+        <field name="name">S3 Attachments</field>
+        <field name="res_model">ir.attachment</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_s3_attachment_search"/>
+        <field name="domain">[('is_s3_attachment', '=', True)]</field>
+        <field name="context">{'default_is_s3_attachment': True}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No S3 attachments found
+            </p>
+            <p>
+                Attachments uploaded to Amazon S3 will appear here.
+                Enable auto-upload in settings to automatically upload chatter attachments.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu item for S3 Attachments -->
+    <menuitem id="menu_s3_attachments"
+              name="S3 Attachments"
+              parent="amazon_s3_connector_menu_root"
+              action="action_s3_attachments"
+              sequence="10"/>
+</odoo>

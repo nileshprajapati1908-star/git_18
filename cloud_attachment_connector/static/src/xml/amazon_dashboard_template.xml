@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--    Dashboard template    -->
+<templates id="template" xml:space="preserve">
+    <t t-name="amazon_s3_connector.AmazonDashboard">
+        <section class="amazon_dashboard_main_section"
+                 id="main_section_manager">
+            <div class="amazon_s3_hero">
+                <div class="amazon_s3_hero_brand">
+                    <img class="amazon_s3_brand_logo"
+                         src="/cloud_attachment_connector/static/src/img/s3_icon.png"
+                         alt="Amazon S3"/>
+                    <div>
+                        <div class="amazon_s3_eyebrow">Amazon S3 Connector</div>
+                        <p class="amazon_s3_hero_subtitle">
+                            Manage synced files, chatter uploads, and manual S3 assets.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="amazon_s3_hero_stats">
+                    <div class="amazon_s3_hero_stat">
+                        <span class="amazon_s3_hero_stat_label">Files</span>
+                        <span class="amazon_s3_hero_stat_value"><t t-esc="dashboardStats.total"/></span>
+                    </div>
+                    <div class="amazon_s3_hero_stat">
+                        <span class="amazon_s3_hero_stat_label">Linked</span>
+                        <span class="amazon_s3_hero_stat_value"><t t-esc="dashboardStats.chatter"/></span>
+                    </div>
+                    <div class="amazon_s3_hero_stat">
+                        <span class="amazon_s3_hero_stat_label">Manual</span>
+                        <span class="amazon_s3_hero_stat_value"><t t-esc="dashboardStats.manual"/></span>
+                    </div>
+                    <div class="amazon_s3_hero_stat">
+                        <span class="amazon_s3_hero_stat_label">Storage</span>
+                        <span class="amazon_s3_hero_stat_value"><t t-esc="dashboardStats.totalSize"/></span>
+                    </div>
+                </div>
+
+                <div class="amazon_s3_header_actions">
+                    <input class="btn amazon_refresh" type="button" value="Refresh"
+                           id="amazon_s3_refresh" t-on-click="refreshFiles"
+                           t-att-disabled="state.loading || state.uploading ? true : undefined"/>
+                    <input class="btn amazon_upload" type="button" value="Upload"
+                           id="amazon_s3_upload" t-on-click="upload"
+                           t-att-disabled="state.loading || state.uploading ? true : undefined"/>
+                </div>
+            </div>
+
+            <div class="amazon_s3_upload_progress" t-if="state.uploading">
+                <div class="amazon_s3_upload_progress_header">
+                    <div>
+                        <div class="amazon_s3_upload_progress_label">Uploading now</div>
+                        <div class="amazon_s3_upload_progress_name">
+                            <t t-esc="state.uploadFileName"/>
+                        </div>
+                    </div>
+                    <div class="amazon_s3_upload_progress_pct">
+                        <t t-esc="state.uploadProgress"/>%
+                    </div>
+                </div>
+                <div class="progress amazon_s3_upload_progress_bar_shell">
+                    <div class="progress-bar amazon_s3_upload_progress_bar"
+                         role="progressbar"
+                         t-att-style="'width: ' + state.uploadProgress + '%;'"
+                         t-att-aria-valuenow="state.uploadProgress"
+                         aria-valuemin="0"
+                         aria-valuemax="100">
+                    </div>
+                </div>
+                <div class="amazon_s3_upload_progress_status">
+                    Uploading to Amazon S3...
+                </div>
+            </div>
+
+            <div class="amazon_dashboard_controls">
+                <input type="search" class="amazon_header-search-input"
+                       placeholder="Search Files" t-on-input="searchFile"/>
+            </div>
+
+            <div class="amazon_content">
+                <div class="amazon_s3_table_shell">
+                    <table class="table table-hover amazon_s3_files_table" id="files_table">
+                        <thead class="table-dark">
+                            <tr>
+                                <th class="sort-number" style="text-align:center;"
+                                    scope="col" t-on-click="sortNumber">SL NO:
+                                </th>
+                                <th class="sort-name" scope="col"
+                                    t-on-click="sortName">Name</th>
+                                <th scope="col">Type</th>
+                                <th scope="col">Related Record</th>
+                                <th scope="col">Last Modified</th>
+                                <th scope="col">Size</th>
+                            </tr>
+                        </thead>
+                        <tbody class="amazon_s3_files">
+                            <t t-foreach="fileRows" t-as="file" t-key="file.sequence">
+                                <tr class="file_row table-secondary">
+                                    <td scope="row" style="text-align:center;">
+                                        <t t-esc="file.displaySequence"/>
+                                    </td>
+                                    <td>
+                                        <a class="file_name" t-att-href="file.url" target="_blank">
+                                            <t t-esc="file.displayName"/>
+                                        </a>
+                                        <a t-att-href="file.url" target="_blank" class="text-dark">
+                                            <i class="fa fa-download download_file"/>
+                                        </a>
+                                    </td>
+                                    <td><t t-esc="file.type.toUpperCase()"/></td>
+                                    <td>
+                                        <t t-if="file.resModel and file.resId">
+                                            <button type="button"
+                                                    class="btn btn-link p-0 text-muted align-baseline related_record_link"
+                                                    t-on-click="() => openRelatedRecord(file)">
+                                                <t t-esc="file.resName"/>
+                                            </button>
+                                        </t>
+                                        <t t-elif="file.resName">
+                                            <small class="text-muted"><t t-esc="file.resName"/></small>
+                                        </t>
+                                        <t t-else="">
+                                            <small class="text-muted">-</small>
+                                        </t>
+                                    </td>
+                                    <td><t t-esc="file.lastModifiedDisplay"/></td>
+                                    <td><t t-esc="file.size"/></td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </t>
+</templates>

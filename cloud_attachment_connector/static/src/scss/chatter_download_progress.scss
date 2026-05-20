@@ -1,0 +1,254 @@
+// ─── OneDrive Chatter Download / Upload Progress ────────────────────────────────────
+
+$onedrive-primary:   #0078d4;
+$onedrive-success:   #22c55e;
+$onedrive-error:     #ef4444;
+$onedrive-upload:    #3b82f6;
+$onedrive-upload-lt: #93c5fd;
+$onedrive-bg:        #0f1117;
+$onedrive-surface:   #1a1d27;
+$onedrive-border:    rgba(255,255,255,0.08);
+$onedrive-radius:    14px;
+$onedrive-shadow:    0 32px 80px rgba(0,0,0,0.7), 0 4px 16px rgba(0,0,0,0.4);
+
+// ── Backdrop ──────────────────────────────────────────────────────────────────
+.onedrive-download-overlay {
+    position:        fixed;
+    inset:           0;
+    z-index:         100000;
+    background:      rgba(0,0,0,0.6);
+    backdrop-filter: blur(6px);
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    animation:       onedrive-overlay-in 0.2s ease both;
+}
+
+// ── Card shell ────────────────────────────────────────────────────────────────
+.onedrive-download-card {
+    width:         480px;
+    max-width:     calc(100vw - 32px);
+    background:    $onedrive-bg;
+    border-radius: $onedrive-radius;
+    box-shadow:    $onedrive-shadow;
+    border:        1px solid rgba($onedrive-primary, 0.2);
+    overflow:      hidden;
+    font-family:   'Inter', 'Segoe UI', system-ui, sans-serif;
+    color:         #e2e8f0;
+    animation:     onedrive-card-in 0.28s cubic-bezier(0.34,1.56,0.64,1) both;
+
+    // ── Header ────────────────────────────────────────────────────────────────
+    .onedrive-dc-header {
+        display:     flex;
+        align-items: center;
+        gap:         12px;
+        padding:     20px 24px 16px;
+        border-bottom: 1px solid $onedrive-border;
+    }
+
+    .onedrive-dc-icon {
+        width:           40px;
+        height:          40px;
+        border-radius:   50%;
+        background:      rgba($onedrive-primary, 0.15);
+        display:         flex;
+        align-items:     center;
+        justify-content: center;
+        flex-shrink:     0;
+        .fa { color: $onedrive-primary; font-size: 18px; }
+    }
+
+    .onedrive-dc-title {
+        font-size:      15px;
+        font-weight:    700;
+        color:          #f1f5f9;
+        letter-spacing: 0.01em;
+    }
+
+    // ── Single-file body (download card) ──────────────────────────────────────
+    .onedrive-dc-filename {
+        font-size:     13px;
+        color:         rgba(255,255,255,0.45);
+        white-space:   nowrap;
+        overflow:      hidden;
+        text-overflow: ellipsis;
+        padding:       14px 24px 0;
+    }
+
+    .onedrive-dc-progress-wrap {
+        height:        6px;
+        background:    rgba(255,255,255,0.08);
+        overflow:      hidden;
+        margin:        12px 24px;
+        border-radius: 99px;
+    }
+
+    .onedrive-dc-bar {
+        height:        100%;
+        border-radius: 99px;
+        background:    linear-gradient(90deg, #106ebe, $onedrive-primary, #40e0d0);
+        transition:    width 0.18s ease;
+        box-shadow:    0 0 10px rgba($onedrive-primary, 0.55);
+
+        &--indeterminate {
+            width: 35% !important;
+            animation: onedrive-indeterminate 1.3s ease-in-out infinite;
+        }
+    }
+
+    .onedrive-dc-meta {
+        display:         flex;
+        justify-content: space-between;
+        align-items:     center;
+        padding:         0 24px 16px;
+        font-size:       12px;
+        color:           rgba(255,255,255,0.4);
+    }
+
+    .onedrive-dc-pct  { font-weight: 700; font-size: 13px; color: $onedrive-primary; }
+    .onedrive-dc-size { font-feature-settings: "tnum"; }
+
+    .onedrive-dc-cancel-btn {
+        display:         none;
+        width:           calc(100% - 48px);
+        margin:          0 24px 20px;
+        padding:         9px 0;
+        background:      rgba(255,255,255,0.04);
+        border:          1px solid rgba(255,255,255,0.1);
+        border-radius:   8px;
+        color:           rgba(255,255,255,0.55);
+        font-size:       13px;
+        font-weight:     600;
+        cursor:          pointer;
+        align-items:     center;
+        justify-content: center;
+        gap:             6px;
+        transition:      background 0.15s, color 0.15s, border-color 0.15s;
+
+        &:hover {
+            background:   rgba($onedrive-error, 0.15);
+            border-color: rgba($onedrive-error, 0.4);
+            color:        #fca5a5;
+        }
+    }
+
+    &.onedrive-upload-card .onedrive-dc-cancel-btn { display: flex; }
+
+    // ── Done / error states ───────────────────────────────────────────────────
+    &.onedrive-dc-done {
+        .onedrive-dc-bar  { background: $onedrive-success; box-shadow: 0 0 10px rgba($onedrive-success,0.5); }
+        .onedrive-dc-pct  { color: $onedrive-success; }
+        .onedrive-dc-icon { background: rgba($onedrive-success,0.15); .fa { color: $onedrive-success; } }
+    }
+    &.onedrive-dc-error {
+        border-color: rgba($onedrive-error, 0.3);
+        .onedrive-dc-bar  { background: $onedrive-error; box-shadow: 0 0 10px rgba($onedrive-error,0.5); }
+        .onedrive-dc-pct  { color: $onedrive-error; }
+    }
+    &.onedrive-dc-fade-out { animation: onedrive-card-out 0.35s ease forwards; }
+}
+
+// ── Upload card — blue accent ─────────────────────────────────────────────────
+.onedrive-upload-card {
+    border-color: rgba($onedrive-upload, 0.25);
+
+    .onedrive-dc-icon {
+        background: rgba($onedrive-upload, 0.15);
+        .fa { color: $onedrive-upload-lt; }
+    }
+    .onedrive-dc-bar {
+        background: linear-gradient(90deg, #1d4ed8, $onedrive-upload, $onedrive-upload-lt);
+        box-shadow: 0 0 10px rgba($onedrive-upload, 0.5);
+    }
+    .onedrive-dc-pct { color: $onedrive-upload-lt; }
+
+    &.onedrive-dc-done {
+        .onedrive-dc-bar  { background: $onedrive-success; box-shadow: 0 0 10px rgba($onedrive-success,0.5); }
+        .onedrive-dc-pct  { color: $onedrive-success; }
+        .onedrive-dc-icon { background: rgba($onedrive-success,0.15); .fa { color: $onedrive-success; } }
+    }
+    .onedrive-dc-cancel-btn {
+        border-color: rgba($onedrive-upload, 0.2);
+    }
+}
+
+// ── Multi-file upload card ────────────────────────────────────────────────────
+.onedrive-multi-upload-card {
+    .onedrive-multi-file-list {
+        max-height: 320px;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255,255,255,0.12) transparent;
+
+        &::-webkit-scrollbar       { width: 4px; }
+        &::-webkit-scrollbar-track { background: transparent; }
+        &::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 99px; }
+    }
+}
+
+.onedrive-multi-file-row {
+    padding:     14px 24px 12px;
+    border-top:  1px solid $onedrive-border;
+    position:    relative;
+
+    &:first-child { border-top: none; }
+
+    // filename
+    .onedrive-dc-filename {
+        padding: 0 0 10px;
+        font-size: 12.5px;
+        color: rgba(255,255,255,0.5);
+    }
+
+    // tighter progress
+    .onedrive-dc-progress-wrap {
+        height:  5px;
+        margin:  0 0 8px;
+    }
+
+    .onedrive-dc-meta {
+        padding:       0 0 10px;
+        font-size:     11.5px;
+    }
+
+    .onedrive-dc-pct  { font-size: 12px; }
+
+    // per-row cancel — compact inline
+    .onedrive-dc-cancel-btn {
+        display:         flex;
+        width:           100%;
+        margin:          0;
+        padding:         7px 0;
+        font-size:       12px;
+        border-radius:   6px;
+        background:      rgba(255,255,255,0.03);
+        border-color:    rgba(255,255,255,0.08);
+    }
+
+    &.onedrive-dc-done {
+        .onedrive-dc-bar { background: $onedrive-success; box-shadow: 0 0 8px rgba($onedrive-success,0.4); }
+        .onedrive-dc-pct { color: $onedrive-success; }
+    }
+    &.onedrive-dc-error {
+        .onedrive-dc-bar { background: $onedrive-error; }
+        .onedrive-dc-pct { color: $onedrive-error; }
+    }
+}
+
+// ── Keyframes ─────────────────────────────────────────────────────────────────
+@keyframes onedrive-overlay-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+@keyframes onedrive-card-in {
+    from { opacity: 0; transform: scale(0.9) translateY(8px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes onedrive-card-out {
+    from { opacity: 1; transform: scale(1); }
+    to   { opacity: 0; transform: scale(0.94); }
+}
+@keyframes onedrive-indeterminate {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(320%); }
+}

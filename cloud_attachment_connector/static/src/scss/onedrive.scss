@@ -1,0 +1,256 @@
+// ─── OneDrive Dashboard Styles ────────────────────────────────────
+
+.o_onedrive_dashboard {
+    padding: 20px;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    
+    .o_onedrive_dashboard_header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #e0e0e0;
+        
+        h2 {
+            margin: 0;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        
+        .o_onedrive_dashboard_actions {
+            display: flex;
+            gap: 10px;
+            
+            .btn {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+            }
+        }
+    }
+
+    .o_onedrive_upload_progress {
+        max-width: 720px;
+    }
+
+    .o_onedrive_header_search_input {
+        border-radius: 999px;
+        height: 38px;
+        width: 100%;
+        max-width: 380px;
+        outline: none;
+        border: 1px solid #7c3f63;
+        font-size: 14px;
+        box-shadow: 0 0 0 3px rgba(124, 63, 99, 0.18), 0 8px 22px rgba(15, 23, 42, 0.12);
+        margin: 0 0 12px;
+        padding: 0 14px;
+        background: #fff;
+    }
+
+    .o_onedrive_header_search_input:focus {
+        border-color: #7c3f63;
+        box-shadow: 0 0 0 4px rgba(124, 63, 99, 0.24), 0 8px 22px rgba(15, 23, 42, 0.12);
+    }
+
+    .o_onedrive_dashboard_content {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        height: calc(100vh - 180px);
+        width: 100%;
+
+        &::-webkit-scrollbar {
+            width: 6px;
+        }
+        &::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        &::-webkit-scrollbar-thumb {
+            background: #7c3f63;
+            border-radius: 10px;
+        }
+        &::-webkit-scrollbar-thumb:hover {
+            background: #5d2e48;
+        }
+
+        .o_onedrive_loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 16px;
+            
+            .fa-spinner {
+                margin-right: 10px;
+            }
+        }
+        
+        .o_onedrive_error {
+            margin-bottom: 20px;
+            
+            .fa-exclamation-triangle {
+                margin-right: 10px;
+            }
+        }
+        
+        .o_onedrive_empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+            
+            .fa-cloud-upload {
+                margin-bottom: 20px;
+                color: #ddd;
+            }
+            
+            h3 {
+                margin: 20px 0 10px;
+                color: #555;
+            }
+            
+            p {
+                margin: 0;
+                font-size: 14px;
+                color: #777;
+            }
+        }
+        
+        .o_onedrive_files_list {
+            overflow: hidden;
+            border-radius: 16px;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+            background: #fff;
+
+            .o_onedrive_files_table {
+                margin: 0;
+                background: white;
+                border: none;
+                margin-bottom: 0;
+                
+                th {
+                    position: sticky;
+                    top: 0;
+                    z-index: 10;
+                    background: #1e293b;
+                    color: #fff;
+                    border-top: none;
+                    font-weight: 600;
+                    border-bottom: none;
+                }
+                
+                td {
+                    vertical-align: middle;
+                    
+                    .fa {
+                        margin-right: 8px;
+                        width: 14px;
+                        text-align: center;
+                        
+                        &.fa-file-pdf-o { color: #dc3545; }
+                        &.fa-file-word-o { color: #007bff; }
+                        &.fa-file-excel-o { color: #28a745; }
+                        &.fa-file-image-o { color: #ffc107; }
+                        &.fa-file-text-o { color: #6c757d; }
+                        &.fa-file-zip-o { color: #6f42c1; }
+                        &.fa-file-o { color: #6c757d; }
+                    }
+                    
+                    .badge {
+                        font-size: 11px;
+                        font-weight: 500;
+                    }
+                    
+                    .btn-link {
+                        padding: 0;
+                        font-size: 13px;
+                        color: #007bff;
+                        text-decoration: none;
+                        
+                        &:hover {
+                            text-decoration: underline;
+                        }
+                    }
+                    
+                    .text-muted {
+                        font-size: 13px;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Cloud Connector Labels ───────────────────────────────────────────────────
+
+.onedrive-dc-connector-label {
+    padding: 0 24px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    letter-spacing: 0.02em;
+    text-transform: none;
+
+    .fa {
+        font-size: 10px;
+        opacity: 0.9;
+    }
+
+    &.onedrive-connector-amazon {
+        color: #ff9900 !important; // S3 Orange
+    }
+
+    &.onedrive-connector-google {
+        color: #4285F4 !important; // Google Blue
+    }
+
+    &.onedrive-connector-onedrive {
+        color: #0078d4 !important; // OneDrive Blue
+    }
+}
+
+.related_record_link {
+    cursor: pointer;
+}
+
+// Responsive design
+@media (max-width: 768px) {
+    .o_onedrive_dashboard {
+        padding: 15px;
+        
+        .o_onedrive_dashboard_header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 15px;
+            
+            .o_onedrive_dashboard_actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+        }
+        
+        .o_onedrive_files_list {
+            .o_onedrive_files_table {
+                font-size: 13px;
+                
+                th, td {
+                    padding: 8px;
+                }
+                
+                .btn {
+                    padding: 4px 8px;
+                    font-size: 12px;
+                }
+            }
+        }
+
+        .o_onedrive_header_search_input {
+            max-width: 100%;
+        }
+    }
+}

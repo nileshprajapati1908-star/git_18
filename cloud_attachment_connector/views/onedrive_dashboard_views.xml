@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <!--    Menu Views for Microsoft OneDrive connector -->
+    <!-- 
+        The OneDrive Dashboard menu visibility is controlled by the 'view_dashboard' 
+        checkbox in the Connector Routing Rules. When view_dashboard is enabled for any 
+        confirmed OneDrive rule, the dashboard menu becomes visible in the menu bar.
+        
+        To hide this dashboard:
+        1. Go to Settings → Cloud Connectors → Connector Routing Rules
+        2. Open the OneDrive rule
+        3. Uncheck the "View Dashboard" option
+        4. Click Confirm
+    -->
+    <record id="onedrive_dashboard_action" model="ir.actions.client">
+        <field name="name">Microsoft OneDrive Dashboard</field>
+        <field name="tag">onedrive_dashboard</field>
+        <field name="target">current</field>
+    </record>
+    <menuitem id="onedrive_connector_menu_root"
+              name="Microsoft OneDrive"
+              web_icon="cloud_attachment_connector,static/description/onedrive.jpeg"
+              action="onedrive_dashboard_action"
+              active="False"/>
+    <menuitem id="onedrive_connector_dashboard_menu"
+              name="Microsoft OneDrive Dashboard"
+              parent="onedrive_connector_menu_root"
+              action="onedrive_dashboard_action"
+              sequence="1"
+              active="False"/>
+</odoo>

@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <record id="view_cloud_connector_rule_list" model="ir.ui.view">
+        <field name="name">cloud.connector.rule.list</field>
+        <field name="model">cloud.connector.rule</field>
+        <field name="arch" type="xml">
+            <list string="Connector Rules" duplicate="0" decoration-muted="state == 'draft'"
+                  decoration-success="state == 'confirmed'">
+                <field name="name"/>
+                <field name="model_ids" widget="many2many_tags"/>
+                <field name="connector"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'confirmed'"
+                       decoration-warning="state == 'draft'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cloud_connector_rule_form" model="ir.ui.view">
+        <field name="name">cloud.connector.rule.form</field>
+        <field name="model">cloud.connector.rule</field>
+        <field name="arch" type="xml">
+            <form string="Connector Rule" duplicate="0">
+                <header>
+                    <button name="action_confirm"
+                            string="Confirm"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state == 'confirmed'"
+                            icon="fa-check"/>
+                    <button name="action_reset_draft"
+                            string="Reset to Draft"
+                            type="object"
+                            invisible="state == 'draft'"
+                            icon="fa-undo"/>
+                    <field name="state"
+                           widget="statusbar"
+                           statusbar_visible="draft,confirmed"/>
+                </header>
+
+                <sheet>
+
+                    <!-- Rule Identity -->
+                    <div class="oe_title">
+                        <label for="name" string="Rule Name"/>
+                        <h1>
+                            <field name="name"
+                                   placeholder="e.g. Amazon S3 — Transfers"
+                                   readonly="state == 'confirmed'"/>
+                        </h1>
+                    </div>
+
+                    <group>
+                        <group string="General">
+                            <field name="connector"
+                                   readonly="state == 'confirmed'"
+                                   widget="radio"/>
+                            <field name="model_ids"
+                                   widget="many2many_tags"
+                                   readonly="state == 'confirmed'"
+                                   placeholder="Select models..."/>
+                            <field name="view_dashboard"
+                                    invisible="state != 'confirmed'"/>
+                        </group>
+                    </group>
+
+                    <!-- Amazon S3 -->
+                    <notebook invisible="connector != 'amazon'">
+                        <page string="Credentials" name="amazon" icon="fa-cloud">
+                            <group col="1">
+                                <group string="Access Credentials" col="2">
+                                    <field name="amazon_access_key"
+                                           placeholder="AKIAIOSFODNN7EXAMPLE"/>
+                                    <field name="amazon_secret_key"
+                                           password="True"
+                                           placeholder="Enter secret key"/>
+                                    <field name="amazon_bucket_name"/>
+                                    <field name="amazon_region" />
+
+
+                                </group>
+                                <group string="Connection" col="2">
+                                    <div colspan="2">
+                                        <p class="text-muted">
+                                            <i class="fa fa-info-circle"/>
+                                            Ensure your IAM user has
+                                            <strong>s3:PutObject</strong>,
+                                            <strong>s3:GetObject</strong>
+                                            and <strong>s3:DeleteObject</strong> permissions on the bucket.
+                                        </p>
+                                        <div class="d-flex gap-2 mt-2">
+                                             <button name="open_amazon_permission_helper"
+                                                    type="object"
+                                                    string="AWS Permission Guide"
+                                                    class="btn btn-secondary"
+                                                    icon="fa-life-ring"/>
+                                            <button name="test_amazon_connection"
+                                                    type="object"
+                                                    string="Test Connection"
+                                                    class="btn btn-primary"
+                                                    icon="fa-plug"/>
+
+                                        </div>
+                                    </div>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="Setup Instructions" name="amazon_instructions" icon="fa-book">
+                            <div class="alert alert-info" role="alert" style="margin-bottom: 1rem;">
+                                <h5 class="alert-heading">
+                                    <i class="fa fa-info-circle"></i> Amazon S3 Configuration Required
+                                </h5>
+                                <p class="mb-3">To use Amazon S3 storage, please follow these steps:</p>
+
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6><strong>Step 1: AWS Setup</strong></h6>
+                                        <ol class="small">
+                                            <li>Go to <a href="https://us-east-1.console.aws.amazon.com/console/home?region=us-east-1#" target="_blank"><strong>AWS Console → IAM → Users → Create user</strong></a></li>
+                                            <li>Go to <strong>Permissions → Add permissions → Create inline policy → JSON</strong> and paste the IAM policy from the <strong>AWS Permission Guide</strong> button</li>
+                                            <li>Go to <strong>Security credentials → Create access key</strong> → Select <em>Application running outside AWS</em> → Copy <strong>Access Key ID</strong> and <strong>Secret Access Key</strong></li>
+                                            <li>Go to <strong>S3 → Create bucket</strong> (General Purpose) → Copy bucket name</li>
+                                            <li>Go to <strong>S3 → Buckets → your bucket → Permissions → CORS</strong> and paste the CORS config from the <strong>AWS Permission Guide</strong> button</li>
+                                        </ol>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6><strong>Step 2: Odoo Settings</strong></h6>
+                                        <ol class="small">
+                                            <li>Fill in <strong>Amazon S3 Access Key</strong>: Your IAM Access Key ID</li>
+                                            <li>Fill in <strong>Amazon S3 Secret Key</strong>: Your IAM Secret Access Key</li>
+                                            <li>Fill in <strong>Folder ID</strong>: Your S3 bucket name</li>
+                                            <li>Click <strong>Test Connection</strong> to verify</li>
+                                            <li>Click <strong>Confirm</strong> to save the rule</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                                
+                                <hr class="my-2"/>
+                                <div class="small">
+                                    <strong>Need help?</strong> Click the <strong>AWS Permission Guide</strong> button below to get the required IAM policy and CORS configuration.
+                                </div>
+                            </div>
+                        </page>
+                    </notebook>
+
+                    <!-- Google Drive -->
+                    <notebook invisible="connector != 'google'">
+                        <page string="Credentials" name="google" icon="fa-google">
+
+                            <group col="1">
+                                <group string="OAuth Credentials" col="2">
+                                    <field name="google_drive_client_id"
+                                           placeholder="xxxx.apps.googleusercontent.com"/>
+                                    <field name="google_drive_client_secret"
+                                           password="True"
+                                           placeholder="Enter client secret"/>
+                                    <field name="google_drive_refresh_token"
+                                           password="True"
+                                           readonly="1"/>
+                                    <field name="google_drive_folder_id" readonly="state == 'confirmed'" />
+                                </group>
+                                <group string="Authorization" col="2">
+                                    <div colspan="2">
+                                        <p class="text-muted">
+                                            <i class="fa fa-info-circle"/>
+                                            After entering Client ID and Client Secret, click <strong>Authorize</strong> to
+                                            complete the OAuth flow. The Refresh Token and Folder ID will be
+                                            populated automatically after authorization.
+                                        </p>
+                                        <div class="d-flex gap-2 mt-2">
+                                            <button name="google_drive_authorize"
+                                                    type="object"
+                                                    string="Authorize Google Drive"
+                                                    class="btn btn-secondary"
+                                                    icon="fa-unlock"/>
+                                            <button name="test_google_drive_connection"
+                                                    type="object"
+                                                    string="Test Connection"
+                                                    class="btn btn-primary"
+                                                    icon="fa-plug"/>
+                                        </div>
+                                    </div>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="Setup Instructions" name="google_instructions" icon="fa-book">
+                            <div class="alert alert-warning" role="alert" style="margin-bottom: 1rem;">
+                                <h5 class="alert-heading">
+                                    <i class="fa fa-wrench"></i> Google Drive Configuration Required
+                                </h5>
+                                <p class="mb-3">Fill in Client ID, Client Secret, and then authorize to get the Refresh Token.</p>
+                                
+                                <h6><i class="fa fa-wrench"></i> Configuration Steps:</h6>
+                                <ol class="mb-3">
+                                    <li>Go to <a href="https://console.cloud.google.com/" target="_blank"><strong>Google Cloud Console</strong></a></li>
+                                    <li>Create or select a project, then go to <strong>APIs &amp; Services → Library</strong> and enable the <strong>Google Drive API</strong></li>
+                                    <li>Go to <strong>APIs &amp; Services → Credentials → Create Credentials → OAuth 2.0 Client ID</strong></li>
+                                    <li>Set application type to <strong>Web application</strong></li>
+                                    <li>Under <strong>Authorized redirect URIs</strong>, add your Odoo instance URL with path: <code>/google_drive/oauth/callback</code></li>
+                                    <li>Copy the <strong>Client ID</strong> and <strong>Client Secret</strong> and paste them in the Credentials tab below</li>
+                                    <li>Click <strong>Authorize Google Drive</strong> to complete the OAuth consent screen</li>
+                                    <li>Once authorized, the <strong>Refresh Token</strong> will be populated automatically</li>
+                                    <li>Click <strong>Test Connection</strong> to verify</li>
+                                    <li>Click <strong>Confirm</strong> to save the rule</li>
+                                </ol>
+
+                                <div class="alert alert-info mt-3">
+                                    <h6><i class="fa fa-lightbulb-o"></i> Quick Tips:</h6>
+                                    <ul class="mb-0">
+                                        <li>Make sure you enable the <strong>Google Drive API</strong> in the Google Cloud Console</li>
+                                        <li>The redirect URI must match exactly (including protocol and case)</li>
+                                        <li>You may need to wait 5-10 minutes after enabling the API before it becomes available</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </page>
+                    </notebook>
+
+                    <!-- OneDrive -->
+                    <notebook invisible="connector != 'onedrive'">
+                        <page string="Credentials" name="onedrive" icon="fa-windows">
+
+                            <group col="1">
+                                <group string="Azure App Credentials">
+                                    <field name="onedrive_tenant_id"
+                                           placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+                                    <field name="onedrive_client_id"
+                                           placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+                                    <field name="onedrive_folder_path"
+                                           placeholder="/Documents/Odoo Attachments"/>
+                                </group>
+                                <group string="Authorization" col="2">
+                                    <div colspan="2">
+                                        <p class="text-muted">
+                                            <i class="fa fa-info-circle"/>
+                                            First register an app in
+                                            <strong>Azure Active Directory</strong>
+                                            and grant
+                                            <strong>Files.ReadWrite.All</strong>
+                                            permission, then click <strong>Authorize Microsoft</strong>.
+                                        </p>
+                                        <div class="d-flex gap-2 mt-2">
+                                            <button name="authorize_with_microsoft"
+                                                    type="object"
+                                                    string="Authorize Microsoft"
+                                                    class="btn btn-secondary"
+                                                    icon="fa-windows"/>
+                                            <button name="test_onedrive_connection"
+                                                    type="object"
+                                                    string="Test Connection"
+                                                    class="btn btn-primary"
+                                                    icon="fa-plug"/>
+                                        </div>
+                                    </div>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="Setup Instructions" name="onedrive_instructions" icon="fa-book">
+                            <div class="alert alert-info" role="alert" style="margin-bottom: 1rem;">
+                                <h3 class="h5 mb-3">
+                                    <i class="fa fa-windows"></i> Microsoft OneDrive Setup
+                                </h3>
+                                
+                                <h6><strong>Missing Settings Checklist:</strong></h6>
+                                <ul class="mb-3">
+                                    <li>OneDrive Tenant ID</li>
+                                    <li>OneDrive Client ID</li>
+                                    <li>Authorization token (obtained via Authorization button)</li>
+                                </ul>
+
+                                <h6><strong>Configuration Steps:</strong></h6>
+                                <ol class="mb-3">
+                                    <li>Go to <a href="https://portal.azure.com" target="_blank"><strong>portal.azure.com</strong></a></li>
+                                    <li>Navigate to <strong>Microsoft Entra ID → App registrations → New registration</strong></li>
+                                    <li>Name: <em>odoo-onedrive</em> → Register</li>
+                                    <li>Copy the <strong>Application (client) ID</strong> → this is your <strong>Client ID</strong></li>
+                                    <li>Copy the <strong>Directory (tenant) ID</strong> → this is your <strong>Tenant ID</strong></li>
+                                    <li>Go to <strong>Authentication</strong> → Add platform → Web</li>
+                                    <li>Set <strong>Redirect URI</strong> to: <code>http://&lt;your-odoo-host&gt;/microsoft/onedrive/callback</code></li>
+                                    <li>Go to <strong>Certificates &amp; secrets</strong> → Create a new client secret (copy the value)</li>
+                                    <li>Go to <strong>API permissions</strong> → Add permission → <strong>Microsoft Graph</strong> → <strong>Files.ReadWrite.All</strong></li>
+                                    <li>Fill in the Tenant ID and Client ID below</li>
+                                    <li>Click <strong>Authorize Microsoft</strong> to complete the authentication flow</li>
+                                    <li>Click <strong>Test Connection</strong> to verify the setup</li>
+                                    <li>Click <strong>Confirm</strong> to save the rule</li>
+                                </ol>
+
+                                <div class="alert alert-success mt-3 mb-0">
+                                    <h6><i class="fa fa-check-circle"></i> Setup Complete When:</h6>
+                                    <ul class="mb-0">
+                                        <li>✓ Tenant ID and Client ID are filled in</li>
+                                        <li>✓ Authorization is successful</li>
+                                        <li>✓ Test Connection shows a green checkmark</li>
+                                        <li>✓ Rule is Confirmed</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </page>
+                    </notebook>
+
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cloud_connector_rule" model="ir.actions.act_window">
+        <field name="name">Connector Routing Rules</field>
+        <field name="res_model">cloud.connector.rule</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No routing rules defined yet.
+            </p>
+            <p>
+                Create rules to control which cloud connector handles
+                attachments for each model.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_cloud_connector_technical"
+              name="Cloud Connectors"
+              parent="base.menu_administration"
+              action="action_cloud_connector_rule"
+              sequence="100"/>
+</odoo>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <!-- This file is intentionally left empty as the attachment uploader patch
+         doesn't require XML templates. All UI is created dynamically via JavaScript. -->
+</templates>

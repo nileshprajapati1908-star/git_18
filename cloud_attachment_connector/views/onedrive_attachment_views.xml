@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <!-- Tree view for OneDrive Attachments -->
+    <record id="view_onedrive_attachment_tree" model="ir.ui.view">
+        <field name="name">ir.attachment.tree.onedrive</field>
+        <field name="model">ir.attachment</field>
+        <field name="inherit_id" ref="base.view_attachment_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="res_model" column_invisible="1"/>
+                <field name="res_id" column_invisible="1"/>
+                <field name="res_name" string="Related Record"/>
+            </xpath>
+
+            <xpath expr="//field[@name='file_size']" position="attributes">
+                <attribute name="column_invisible">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='company_id']" position="attributes">
+                <attribute name="column_invisible">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='type']" position="attributes">
+                <attribute name="column_invisible">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='res_name']" position="attributes">
+                <attribute name="column_invisible">1</attribute>
+            </xpath>
+
+            <xpath expr="//field[@name='res_model']" position="replace"/>
+            <xpath expr="//field[@name='res_id']" position="replace"/>
+            <xpath expr="//field[@name='res_name']" position="after">
+                <field name="onedrive_item_id" optional="hide"/>
+                <field name="onedrive_url" string="OneDrive URL" widget="url" optional="show"/>
+                <field name="is_onedrive_attachment" column_invisible="1"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Form view for OneDrive Attachments -->
+    <record id="view_onedrive_attachment_form" model="ir.ui.view">
+        <field name="name">ir.attachment.form.onedrive</field>
+        <field name="model">ir.attachment</field>
+        <field name="inherit_id" ref="base.view_attachment_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="before">
+                <header>
+                    <button name="action_refresh_onedrive_url" type="object" string="Refresh OneDrive URL" class="btn-primary" invisible="not is_onedrive_attachment"/>
+                </header>
+            </xpath>
+            <xpath expr="//field[@name='datas']" position="after">
+                <group string="OneDrive Information" invisible="not is_onedrive_attachment">
+                    <field name="is_onedrive_attachment" invisible="1"/>
+                    <field name="onedrive_item_id" readonly="1"/>
+                    <field name="onedrive_url" string="OneDrive URL" readonly="1" widget="url"/>
+                    <button name="action_open_onedrive_object" type="object" string="Open Object URL" class="btn-link"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Search view for OneDrive Attachments -->
+    <record id="view_onedrive_attachment_search" model="ir.ui.view">
+        <field name="name">ir.attachment.search.onedrive</field>
+        <field name="model">ir.attachment</field>
+        <field name="arch" type="xml">
+            <search string="OneDrive Attachments">
+                <filter string="Stored on OneDrive" name="onedrive_attachments" domain="[('is_onedrive_attachment', '=', True)]"/>
+                <filter string="Chatter Attachments" name="chatter_attachments" domain="[('is_onedrive_attachment', '=', True), ('res_model', '!=', False), ('res_id', '!=', 0)]"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action for OneDrive Attachments -->
+    <record id="action_onedrive_attachments" model="ir.actions.act_window">
+        <field name="name">OneDrive Attachments</field>
+        <field name="res_model">ir.attachment</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_onedrive_attachment_search"/>
+        <field name="domain">[('is_onedrive_attachment', '=', True)]</field>
+        <field name="context">{'default_is_onedrive_attachment': True}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No OneDrive attachments found
+            </p>
+            <p>
+                Attachments uploaded to Microsoft OneDrive will appear here.
+                Enable auto-upload in settings to automatically upload chatter attachments.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_onedrive_attachments_tree_view" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_onedrive_attachment_tree"/>
+        <field name="act_window_id" ref="action_onedrive_attachments"/>
+    </record>
+
+    <record id="action_onedrive_attachments_form_view" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_onedrive_attachment_form"/>
+        <field name="act_window_id" ref="action_onedrive_attachments"/>
+    </record>
+
+    <!-- Menu item for OneDrive Attachments -->
+    <menuitem id="menu_onedrive_attachments"
+              name="OneDrive Attachments"
+              parent="onedrive_connector_menu_root"
+              action="action_onedrive_attachments"
+              sequence="10"/>
+</odoo>
