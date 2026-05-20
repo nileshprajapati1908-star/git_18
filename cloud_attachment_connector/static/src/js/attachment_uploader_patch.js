@@ -227,9 +227,16 @@ async function uploadChunksToGoogleDrive(file, sessionUrl, card) {
                 return;
             }
             if (xhr.status >= 200 && xhr.status < 300) {
-                const jsonResponse = xhr.response && typeof xhr.response === "object" ? xhr.response : _parseResponseText(xhr.responseText);
+                let jsonResponse = (xhr.response && typeof xhr.response === "object") ? xhr.response : null;
                 if (!jsonResponse) {
-                    reject(_errorFromResponse(xhr.status, xhr.responseText, "Google Drive upload failed"));
+                    try {
+                        jsonResponse = _parseResponseText(xhr.responseText);
+                    } catch (e) {
+                        jsonResponse = null;
+                    }
+                }
+                if (!jsonResponse) {
+                    reject(new Error("Google Drive upload failed: invalid response"));
                     return;
                 }
                 googleFile = jsonResponse;
@@ -238,7 +245,23 @@ async function uploadChunksToGoogleDrive(file, sessionUrl, card) {
                 resolve();
                 return;
             }
-            reject(_errorFromResponse(xhr.status, xhr.responseText, "Google Drive upload failed"));
+            let errorMessage = "Google Drive upload failed";
+            try {
+                let errorBody = (xhr.response && typeof xhr.response === "object") ? xhr.response : null;
+                if (!errorBody) {
+                    try {
+                        errorBody = _parseResponseText(xhr.responseText);
+                    } catch (e) {
+                        errorBody = null;
+                    }
+                }
+                if (errorBody && errorBody.error) {
+                    errorMessage = errorBody.error.message || errorBody.error;
+                }
+            } catch (e) {
+                // ignore
+            }
+            reject(new Error(`${errorMessage} (${xhr.status})`));
         };
         xhr.onerror = () => reject(new Error("Google Drive upload failed (network error)."));
         xhr.onabort = () => reject(Object.assign(new Error("Upload aborted."), { name: "AbortError" }));
@@ -255,6 +278,7 @@ async function uploadChunksToGoogleDrive(file, sessionUrl, card) {
 }
 
 async function finalizeGoogleDriveAttachment({ orm, store, file, thread, composer, options, driveFileId, card }) {
+    console.log("🟡 Finalizing Google Drive attachment:", file.name, driveFileId);
     card.setIndeterminate("Saving attachment...");
     const result = await orm.call(
         "google_drive.dashboard",
@@ -267,15 +291,7 @@ async function finalizeGoogleDriveAttachment({ orm, store, file, thread, compose
     if (result.store_data && store) {
         store.insert(result.store_data);
     }
-    const attachment = store?.["ir.attachment"]?.get(result.attachment_id) || null;
-    if (composer && attachment) {
-        const index = composer.attachments.findIndex(({ id }) => id === result.attachment_id);
-        if (index >= 0) {
-            composer.attachments[index] = attachment;
-        } else {
-            composer.attachments.push(attachment);
-        }
-    }
+    const attachment = store.Attachment.get(result.attachment_id) || null;
     card.finish();
     return attachment;
 }
@@ -331,7 +347,7 @@ async function uploadThroughCloudController({ file, thread, composer, options, s
             store.insert(store_data);
         }
         localCard.finish();
-        return store?.["ir.attachment"]?.get(attachment_id) || null;
+        return store.Attachment.get(attachment_id) || null;
     } catch (error) {
         localCard.fail(error?.message || "Upload failed");
         throw error;
@@ -379,7 +395,6 @@ async function finalizeS3Attachment({ orm, store, file, thread, composer, option
     });
     console.log("🟡 [S3] Finalize response status:", finalizeResp.status);
     const finalizeText = await finalizeResp.text();
-    console.log("🟡 [S3] Finalize response body:", finalizeText);
     const finalizeData = _parseResponseText(finalizeText);
     if (finalizeData === null) {
         throw _errorFromResponse(finalizeResp.status, finalizeText, "Finalize failed");
@@ -392,15 +407,7 @@ async function finalizeS3Attachment({ orm, store, file, thread, composer, option
     if (store_data) {
         store.insert(store_data);
     }
-    const attachment = store?.["ir.attachment"]?.get(attachment_id) || null;
-    if (composer && attachment) {
-        const index = composer.attachments.findIndex(({ id }) => id === attachment_id);
-        if (index >= 0) {
-            composer.attachments[index] = attachment;
-        } else {
-            composer.attachments.push(attachment);
-        }
-    }
+    const attachment = store.Attachment.get(attachment_id) || null;
     card.finish();
     return attachment;
 }
@@ -683,6 +690,7 @@ async function makeOneDriveKey(fileName, thread, orm) {
 }
 
 async function createOneDriveAttachment({ orm, store, file, thread, composer, options, onedriveKey, provider }) {
+    console.log("🚀 Starting OneDrive upload for:", file.name);
     const card = createProgressCard(file.name, provider || "onedrive");
     const fileType = file.type || "application/octet-stream";
     const partSize = 4 * 1024 * 1024;
@@ -691,8 +699,6 @@ async function createOneDriveAttachment({ orm, store, file, thread, composer, op
         try {
             console.log("=== ONEDRIVE JS DEBUG ===");
             console.log("Creating upload session for:", file.name);
-            console.log("File type:", fileType);
-            console.log("OneDrive key:", onedriveKey);
             await new Promise(requestAnimationFrame);
 
             const session = await orm.call("onedrive.dashboard", "create_upload_session", [[], file.name, fileType, onedriveKey]);
@@ -704,11 +710,6 @@ async function createOneDriveAttachment({ orm, store, file, thread, composer, op
         }
 
         const uploadUrl = session.upload_url;
-        console.log("Upload URL:", uploadUrl);
-        console.log("File size:", file.size);
-        console.log("Part size:", partSize);
-        console.log("Total parts:", Math.ceil(file.size / partSize));
-
         const totalParts = Math.ceil(file.size / partSize);
         const progressByPart = new Map();
         const xhrs = new Set();
@@ -728,10 +729,7 @@ async function createOneDriveAttachment({ orm, store, file, thread, composer, op
             const end = Math.min(file.size, start + partSize);
             const blob = file.slice(start, end);
 
-            console.log(`=== CHUNK ${partNumber} DEBUG ===`);
-            console.log(`Chunk ${partNumber}: bytes ${start}-${end - 1}/${file.size}`);
-            console.log(`Blob size: ${blob.size}`);
-            console.log(`Upload URL: ${uploadUrl}`);
+            console.log(`Chunk ${partNumber}/${totalParts}: bytes ${start}-${end - 1}/${file.size}`);
 
             const xhr = new XMLHttpRequest();
             xhrs.add(xhr);
@@ -739,7 +737,6 @@ async function createOneDriveAttachment({ orm, store, file, thread, composer, op
                 const result = await new Promise((resolve, reject) => {
                     xhr.open("PUT", uploadUrl);
                     xhr.setRequestHeader("Content-Range", `bytes ${start}-${end - 1}/${file.size}`);
-                    console.log(`Headers: Content-Length=${blob.size}, Content-Range=bytes ${start}-${end - 1}/${file.size}`);
 
                     xhr.upload.onprogress = (e) => {
                         if (!e.lengthComputable) return;
@@ -748,16 +745,18 @@ async function createOneDriveAttachment({ orm, store, file, thread, composer, op
                         recalcProgress();
                     };
                     xhr.onload = () => {
-                        console.log(`Chunk ${partNumber} response status: ${xhr.status}`);
-                        console.log(`Chunk ${partNumber} response text: ${xhr.responseText}`);
-
                         if (xhr.status >= 200 && xhr.status < 300) {
                             progressByPart.set(partNumber, blob.size);
                             recalcProgress();
                             if (xhr.status === 200 || xhr.status === 201) {
-                                const body = _parseResponseText(xhr.responseText);
+                                let body = null;
+                                try {
+                                    body = _parseResponseText(xhr.responseText);
+                                } catch (e) {
+                                    body = (xhr.response && typeof xhr.response === "object") ? xhr.response : null;
+                                }
                                 if (body === null) {
-                                    reject(_errorFromResponse(xhr.status, xhr.responseText, `Chunk ${partNumber} failed`));
+                                    reject(new Error(`Chunk ${partNumber} failed: invalid response`));
                                     return;
                                 }
                                 resolve(body);
@@ -768,15 +767,11 @@ async function createOneDriveAttachment({ orm, store, file, thread, composer, op
                             reject(new Error(`Chunk ${partNumber} failed (status ${xhr.status}): ${xhr.responseText || ""}`));
                         }
                     };
-                    xhr.onerror = () => {
-                        console.log(`Chunk ${partNumber} network error`);
-                        reject(new Error(`Chunk ${partNumber} network error`));
-                    };
+                    xhr.onerror = () => reject(new Error(`Chunk ${partNumber} network error`));
                     xhr.onabort = () => reject(Object.assign(new Error("Upload aborted"), { name: "AbortError" }));
                     xhr.send(blob);
                 });
 
-                // If we get a complete response, the upload is done
                 if (result && (result.id || result.complete)) {
                     return result;
                 }
@@ -785,16 +780,15 @@ async function createOneDriveAttachment({ orm, store, file, thread, composer, op
             }
         };
 
-        // Upload chunks sequentially (OneDrive resumable upload works this way)
         let finalResult = null;
         for (let partNumber = 1; partNumber <= totalParts; partNumber++) {
             finalResult = await uploadChunk(partNumber);
             if (finalResult && finalResult.id) {
-                // Upload completed early
                 break;
             }
         }
 
+        console.log("OneDrive upload chunks done, finalizing...");
         return await finalizeOneDriveAttachment({
             orm, store, file, thread, composer, options,
             onedriveKey, card,
@@ -802,6 +796,7 @@ async function createOneDriveAttachment({ orm, store, file, thread, composer, op
         });
 
     } catch (error) {
+        console.error("OneDrive upload error:", error);
         abortGroup?.abort?.();
         if (error?.name === "AbortError") {
             card.remove();
@@ -811,7 +806,7 @@ async function createOneDriveAttachment({ orm, store, file, thread, composer, op
                 error?.message || ""
             )
         ) {
-            card.remove(); // silently remove, fallback will handle it
+            card.remove();
         } else {
             card.fail(error?.message || "Upload failed");
         }
@@ -820,6 +815,7 @@ async function createOneDriveAttachment({ orm, store, file, thread, composer, op
 }
 
 async function finalizeOneDriveAttachment({ orm, store, file, thread, composer, options, onedriveKey, card, uploadResult }) {
+    console.log("🟡 Finalizing OneDrive attachment:", file.name, uploadResult?.id);
     card.setIndeterminate("Saving attachment...");
     const downloadUrl =
         uploadResult?.download_url ||
@@ -856,18 +852,9 @@ async function finalizeOneDriveAttachment({ orm, store, file, thread, composer, 
     const { store_data, attachment_id } = finalizeData.data || {};
     if (store_data) store.insert(store_data);
 
-    const attachment = store?.["ir.attachment"]?.get(attachment_id);
-    if (composer && attachment) {
-        const index = composer.attachments.findIndex(({ id }) => id === attachment_id);
-        if (index >= 0) {
-            composer.attachments[index] = attachment;
-        } else {
-            composer.attachments.push(attachment);
-        }
-    }
-
+    const attachment = store.Attachment.get(attachment_id) || null;
     card.finish();
-    return attachment || null;
+    return attachment;
 }
 
 patch(FileUploader.prototype, {
@@ -967,12 +954,12 @@ patch(AttachmentUploader.prototype, {
                         }
                         return attachment;
                     } catch (fallbackError) {
-                        temp?.attachment?.remove?.();
+                        temp?.attachment?.delete?.();
                         throw fallbackError;
                     }
                 }
             } else {
-                temp?.attachment?.remove?.();
+                temp?.attachment?.delete?.();
                 card.remove();
             }
         }
@@ -989,7 +976,7 @@ patch(AttachmentUploader.prototype, {
                 }
                 return attachment;
             } catch (error) {
-                temp?.attachment?.remove?.();
+                temp?.attachment?.delete?.();
                 throw error;
             }
         }
@@ -1006,7 +993,7 @@ patch(AttachmentUploader.prototype, {
                 }
                 return attachment;
             } catch (error) {
-                temp?.attachment?.remove?.();
+                temp?.attachment?.delete?.();
                 throw error;
             }
         }

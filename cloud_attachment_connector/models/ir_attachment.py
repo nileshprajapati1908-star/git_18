@@ -549,3 +549,10 @@ class IrAttachment(models.Model):
         drive_id = self.env["ir.config_parameter"].sudo().get_param("microsoft_onedrive_connector.drive_id")
         base = f"https://graph.microsoft.com/v1.0/drives/{drive_id}" if drive_id else "https://graph.microsoft.com/v1.0/me/drive"
         requests.delete(f"{base}/items/{item_id}", headers=headers, timeout=30)
+
+    def _post_add_create(self, **kwargs):
+        """
+        Hook for post-processing after attachment creation.
+        Can be overridden by other modules to handle specific logic.
+        """
+        return True

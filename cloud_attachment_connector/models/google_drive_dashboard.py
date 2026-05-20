@@ -269,12 +269,17 @@ class GoogleDriveDashboard(models.Model):
             return {'success': False, 'error': str(e)}
 
     def finalize_chatter_drive_upload(self, file_name, file_type, file_size=None, drive_file_id=False, thread_id=None, thread_model=None, is_pending=False, activity_id=False):
+        _logger.info("Finalizing Google Drive upload for %s (ID: %s)", file_name, drive_file_id)
         try:
             if not drive_file_id:
+                _logger.warning("Missing Google Drive file ID for %s", file_name)
                 return {"success": False, "error": "Missing Google Drive file ID"}
 
             is_manual_upload = not thread_model or not thread_id or str(thread_id) == "0"
             is_pending_upload = is_pending and is_pending != "false"
+            
+            _logger.info("Upload params: thread_model=%s, thread_id=%s, is_pending=%s", thread_model, thread_id, is_pending)
+            
             vals = {
                 "name": file_name,
                 "res_id": 0 if is_manual_upload or is_pending_upload else int(thread_id),
@@ -289,12 +294,18 @@ class GoogleDriveDashboard(models.Model):
             if not is_manual_upload:
                 vals.update({"chatter_thread_model": thread_model, "chatter_thread_id": int(thread_id)})
 
+            _logger.info("Creating attachment with vals: %s", vals)
             attachment = self.env["ir.attachment"].create(vals)
+            _logger.info("Created attachment ID: %s", attachment.id)
+            
             post_kwargs = {"thread_id": thread_id, "thread_model": thread_model, "is_pending": is_pending}
             if activity_id:
                 post_kwargs["activity_id"] = activity_id
+            
+            _logger.info("Calling _post_add_create with kwargs: %s", post_kwargs)
             attachment._post_add_create(**post_kwargs)
-            return {
+            
+            result = {
                 "success": True,
                 "attachment_id": attachment.id,
                 "store_data": Store().add(
@@ -302,6 +313,8 @@ class GoogleDriveDashboard(models.Model):
                     extra_fields=self.env["ir.attachment"]._get_store_ownership_fields(),
                 ).get_result(),
             }
+            _logger.info("Finalization successful for %s", file_name)
+            return result
         except Exception as e:
             _logger.exception("Failed to finalize chatter Drive upload for %s", drive_file_id)
             return {"success": False, "error": str(e)}
