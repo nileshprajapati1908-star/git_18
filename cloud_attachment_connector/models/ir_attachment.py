@@ -2,6 +2,7 @@
 import base64
 import logging
 import os
+import threading
 import uuid
 from io import BytesIO
 
@@ -13,12 +14,62 @@ _logger = logging.getLogger(__name__)
 _DATAS_COMPUTE_LIMIT = 100 * 1024 * 1024
 
 
+def _delete_cloud_files_bg(tasks):
+    """Delete cloud files in a background thread so chatter responds instantly."""
+    for task in tasks:
+        try:
+            if task["type"] == "s3":
+                import boto3
+                access_key = task["access_key"]
+                secret_key = task["secret_key"]
+                bucket = task["bucket"]
+                s3_key = task["s3_key"]
+                if access_key and secret_key and bucket and s3_key:
+                    client = boto3.client("s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key)
+                    region = client.get_bucket_location(Bucket=bucket).get("LocationConstraint") or "us-east-1"
+                    client = boto3.client("s3", region_name=region, aws_access_key_id=access_key, aws_secret_access_key=secret_key)
+                    client.delete_object(Bucket=bucket, Key=s3_key)
+            elif task["type"] == "google":
+                from google.oauth2.credentials import Credentials
+                from google.auth.transport.requests import Request
+                from googleapiclient.discovery import build
+                creds = Credentials(
+                    token=None,
+                    refresh_token=task["refresh_token"],
+                    token_uri="https://oauth2.googleapis.com/token",
+                    client_id=task["client_id"],
+                    client_secret=task["client_secret"],
+                    scopes=["https://www.googleapis.com/auth/drive"],
+                )
+                creds.refresh(Request())
+                build("drive", "v3", credentials=creds).files().delete(fileId=task["file_id"]).execute()
+            elif task["type"] == "onedrive":
+                import requests as _requests
+                token = task["token"]
+                item_id = task["item_id"]
+                drive_id = task["drive_id"]
+                if token and item_id:
+                    base = (
+                        f"https://graph.microsoft.com/v1.0/drives/{drive_id}"
+                        if drive_id
+                        else "https://graph.microsoft.com/v1.0/me/drive"
+                    )
+                    _requests.delete(
+                        f"{base}/items/{item_id}",
+                        headers={"Authorization": f"Bearer {token}"},
+                        timeout=30,
+                    )
+        except Exception as e:
+            _logger.error("Background cloud file deletion failed (%s): %s", task.get("type"), e)
+
+
 class IrAttachment(models.Model):
     _inherit = "ir.attachment"
 
     is_s3_attachment = fields.Boolean(default=False)
     s3_key = fields.Char()
     s3_url = fields.Char(compute="_compute_s3_url")
+    s3_file_size = fields.Char()
 
     is_drive_attachment = fields.Boolean(default=False)
     drive_file_id = fields.Char()
@@ -35,6 +86,25 @@ class IrAttachment(models.Model):
     related_record_name = fields.Char(compute="_compute_related_record_name", store=True)
 
     _large_file_index_limit = 10 * 1024 * 1024
+
+    @api.model
+    def _get_store_ownership_fields(self):
+        return [
+            "is_s3_attachment",
+            "s3_key",
+            "s3_url",
+            "is_drive_attachment",
+            "drive_file_id",
+            "drive_url",
+            "drive_file_size",
+            "is_onedrive_attachment",
+            "onedrive_item_id",
+            "onedrive_url",
+            "onedrive_file_size",
+            "chatter_thread_model",
+            "chatter_thread_id",
+            "related_record_name",
+        ]
 
     @api.model
     def _index(self, bin_data: bytes, file_type: str, checksum=None):
@@ -87,6 +157,8 @@ class IrAttachment(models.Model):
         for vals in vals_list:
             vals = dict(vals)
             size = vals.get("file_size")
+            if vals.get("is_s3_attachment") and size is not None:
+                vals["s3_file_size"] = str(size)
             if vals.get("is_drive_attachment") and size is not None:
                 vals["drive_file_size"] = str(size)
             if vals.get("is_onedrive_attachment") and size is not None:
@@ -105,32 +177,54 @@ class IrAttachment(models.Model):
             vals["raw"] = False
         return super().write(vals)
 
-    def _delete_remote_files(self):
+    def _collect_cloud_deletion_tasks(self):
+        """Collect all data needed to delete cloud files, before the DB records are removed."""
+        tasks = []
         for att in self.filtered(lambda a: a.is_s3_attachment and a.s3_key):
             try:
-                client, bucket = att._get_s3_client(att._get_rule_for_attachment(att, "amazon"))
-                if client and bucket:
-                    client.delete_object(Bucket=bucket, Key=att.s3_key)
+                rule = att._get_rule_for_attachment(att, "amazon")
+                tasks.append({
+                    "type": "s3",
+                    "access_key": rule.amazon_access_key if rule else None,
+                    "secret_key": rule.amazon_secret_key if rule else None,
+                    "bucket": rule.amazon_bucket_name if rule else None,
+                    "s3_key": att.s3_key,
+                })
             except Exception:
                 pass
         for att in self.filtered(lambda a: a.is_drive_attachment and a.drive_file_id):
             try:
-                service = att._get_drive_service(att._get_rule_for_attachment(att, "google"))
-                if service:
-                    service.files().delete(fileId=att.drive_file_id).execute()
+                rule = att._get_rule_for_attachment(att, "google")
+                tasks.append({
+                    "type": "google",
+                    "client_id": rule.google_drive_client_id if rule else None,
+                    "client_secret": rule.google_drive_client_secret if rule else None,
+                    "refresh_token": rule.google_drive_refresh_token if rule else None,
+                    "file_id": att.drive_file_id,
+                })
             except Exception:
                 pass
         for att in self.filtered(lambda a: a.is_onedrive_attachment and a.onedrive_item_id):
             try:
-                att._delete_onedrive_item(att.onedrive_item_id, rule=att._get_rule_for_attachment(att, "onedrive"))
+                rule = att._get_rule_for_attachment(att, "onedrive")
+                token = self.env["onedrive.dashboard"]._get_access_token(rule=rule)
+                drive_id = self.env["ir.config_parameter"].sudo().get_param("microsoft_onedrive_connector.drive_id")
+                tasks.append({
+                    "type": "onedrive",
+                    "token": token,
+                    "drive_id": drive_id,
+                    "item_id": att.onedrive_item_id,
+                })
             except Exception:
                 pass
+        return tasks
 
     def unlink(self):
         cloud = self.filtered(lambda a: a.is_s3_attachment or a.is_drive_attachment or a.is_onedrive_attachment)
-        if cloud:
-            cloud._delete_remote_files()
+        tasks = cloud._collect_cloud_deletion_tasks() if cloud else []
         res = super().unlink()
+        if tasks:
+            threading.Thread(target=_delete_cloud_files_bg, args=(tasks,), daemon=True).start()
         return res
 
     def action_refresh_s3_url(self):
@@ -153,24 +247,6 @@ class IrAttachment(models.Model):
     def action_open_onedrive_object(self):
         self.ensure_one()
         return {"type": "ir.actions.act_url", "url": self.onedrive_url or "/onedrive/attachment/%s" % self.id, "target": "new"}
-
-    def _get_store_ownership_fields(self):
-        return [
-            "is_s3_attachment",
-            "s3_key",
-            "s3_url",
-            "is_drive_attachment",
-            "drive_file_id",
-            "drive_url",
-            "drive_file_size",
-            "is_onedrive_attachment",
-            "onedrive_item_id",
-            "onedrive_url",
-            "onedrive_file_size",
-            "chatter_thread_model",
-            "chatter_thread_id",
-            "related_record_name",
-        ]
 
     def _to_http_stream(self):
         self.ensure_one()
@@ -336,25 +412,6 @@ class IrAttachment(models.Model):
         credentials.refresh(Request())
         return build("drive", "v3", credentials=credentials)
 
-    def _get_drive_storage_quota(self, rule=None):
-        service = self._get_drive_service(rule)
-        if not service:
-            raise UserError("Google Drive credentials not configured properly")
-        about = service.about().get(fields="storageQuota").execute()
-        quota = about.get("storageQuota") or {}
-        limit = int(quota["limit"]) if quota.get("limit") not in (None, "") else None
-        usage = int(quota["usage"]) if quota.get("usage") not in (None, "") else 0
-        return {"limit": limit, "usage": usage}
-
-    def _validate_drive_storage_capacity(self, required_bytes=0, rule=None):
-        quota = self._get_drive_storage_quota(rule)
-        limit = quota.get("limit")
-        if limit is None:
-            return quota
-        if quota.get("usage", 0) + int(required_bytes or 0) > limit:
-            raise UserError("Google Drive storage quota has been exceeded.")
-        return quota
-
     def _get_drive_token(self, rule=None):
         rule = self._get_rule_for_connector("google", rule)
         client_id = rule.google_drive_client_id if rule else False
@@ -393,42 +450,23 @@ class IrAttachment(models.Model):
             rule.write({"google_drive_folder_id": folder["id"]})
         return folder["id"]
 
-    def _upload_to_drive(self, file_data, file_name, rule=None, file_size=None):
+    def _upload_to_drive(self, file_data, file_name, rule=None):
         service = self._get_drive_service(rule)
         if not service:
             raise UserError("Google Drive credentials not configured properly")
         from googleapiclient.http import MediaIoBaseUpload
 
         rule = self._get_rule_for_connector("google", rule)
-        if file_size is None:
-            if isinstance(file_data, (bytes, bytearray)):
-                file_size = len(file_data)
-            elif hasattr(file_data, "seek") and hasattr(file_data, "tell"):
-                pos = file_data.tell()
-                file_data.seek(0, os.SEEK_END)
-                file_size = file_data.tell()
-                file_data.seek(pos, os.SEEK_SET)
-            else:
-                file_size = 0
-        self._validate_drive_storage_capacity(file_size, rule=rule)
         folder_id = rule.google_drive_folder_id if rule and rule.google_drive_folder_id else self._get_or_create_drive_folder(service, rule)
-        if hasattr(file_data, "seek"):
-            file_data.seek(0)
-            media_source = file_data
-        elif isinstance(file_data, (bytes, bytearray)):
+        if isinstance(file_data, (bytes, bytearray)):
             media_source = BytesIO(file_data)
         elif hasattr(file_data, "read"):
-            media_source = file_data
+            media_source = BytesIO(file_data.read())
         else:
             media_source = BytesIO(file_data)
         media = MediaIoBaseUpload(media_source, mimetype=self._get_content_type(file_name), resumable=True)
-        try:
-            file = service.files().create(body={"name": file_name, "parents": [folder_id]}, media_body=media,
-                                          fields="id,webViewLink").execute()
-        except Exception as err:
-            if "storageQuotaExceeded" in str(err):
-                raise UserError("Google Drive storage quota has been exceeded.")
-            raise
+        file = service.files().create(body={"name": file_name, "parents": [folder_id]}, media_body=media,
+                                      fields="id,webViewLink").execute()
         service.permissions().create(fileId=file["id"], body={"role": "reader", "type": "anyone"}).execute()
         return {
             "drive_file_id": file["id"],
@@ -549,10 +587,3 @@ class IrAttachment(models.Model):
         drive_id = self.env["ir.config_parameter"].sudo().get_param("microsoft_onedrive_connector.drive_id")
         base = f"https://graph.microsoft.com/v1.0/drives/{drive_id}" if drive_id else "https://graph.microsoft.com/v1.0/me/drive"
         requests.delete(f"{base}/items/{item_id}", headers=headers, timeout=30)
-
-    def _post_add_create(self, **kwargs):
-        """
-        Hook for post-processing after attachment creation.
-        Can be overridden by other modules to handle specific logic.
-        """
-        return True

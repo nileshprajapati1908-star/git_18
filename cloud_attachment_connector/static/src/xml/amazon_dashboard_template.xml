@@ -69,12 +69,31 @@
                 </div>
                 <div class="amazon_s3_upload_progress_status">
                     Uploading to Amazon S3...
+                    <button class="btn btn-sm btn-danger ml-2" t-on-click="abortUpload">Cancel</button>
                 </div>
             </div>
 
             <div class="amazon_dashboard_controls">
                 <input type="search" class="amazon_header-search-input"
                        placeholder="Search Files" t-on-input="searchFile"/>
+                
+                <div class="amazon_pager ms-auto" t-if="pagerProps.total > 0">
+                    <span class="amazon_pager_value">
+                        <t t-esc="pagerProps.start"/>-<t t-esc="pagerProps.end"/> / <t t-esc="pagerProps.total"/>
+                    </span>
+                    <div class="btn-group amazon_pager_buttons ms-2">
+                        <button type="button" class="btn btn-outline-secondary amazon_pager_prev"
+                                t-att-disabled="!pagerProps.hasPrevious"
+                                t-on-click="prevPage">
+                            <i class="fa fa-chevron-left"/>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary amazon_pager_next"
+                                t-att-disabled="!pagerProps.hasNext"
+                                t-on-click="nextPage">
+                            <i class="fa fa-chevron-right"/>
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div class="amazon_content">

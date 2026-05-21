@@ -3,8 +3,6 @@ import logging
 import secrets
 import urllib.parse
 
-from googleapiclient.errors import HttpError
-
 from odoo import fields, models, api
 from odoo.exceptions import ValidationError
 
@@ -163,15 +161,18 @@ class CloudConnectorRule(models.Model):
             if connector == 'amazon':
                 if not rule.amazon_access_key or not rule.amazon_secret_key or not rule.amazon_bucket_name:
                     raise ValidationError("Amazon S3 is incomplete. Please configure Access Key, Secret Key and Bucket Name.")
+                rule.test_amazon_connection()
                 rule._apply_s3_cors_policy()
 
             elif connector == 'google':
                 if not rule.google_drive_client_id or not rule.google_drive_client_secret or not rule.google_drive_refresh_token:
                     raise ValidationError("Google Drive is incomplete. Please configure Client ID, Client Secret and authorize.")
+                rule.test_google_drive_connection()
 
             elif connector == 'onedrive':
                 if not rule.onedrive_tenant_id or not rule.onedrive_client_id:
                     raise ValidationError("OneDrive is incomplete. Please configure Tenant ID and Client ID.")
+                rule.test_onedrive_connection()
 
             rule.write({'state': 'confirmed'})
 
@@ -243,17 +244,48 @@ class CloudConnectorRule(models.Model):
         try:
             import boto3
 
+            # Validate credentials via STS (returns proper error codes, unlike head_bucket)
+            sts = boto3.client(
+                "sts",
+                aws_access_key_id=self.amazon_access_key,
+                aws_secret_access_key=self.amazon_secret_key,
+            )
+            try:
+                sts.get_caller_identity()
+            except Exception as cred_err:
+                code = ""
+                try:
+                    code = cred_err.response["Error"]["Code"]
+                except Exception:
+                    pass
+                if code in ("InvalidClientTokenId", "InvalidAccessKeyId", "AuthFailure"):
+                    raise ValidationError("Invalid Amazon Access Key. The Access Key ID does not exist in your AWS account. Please verify your credentials.")
+                if code == "SignatureDoesNotMatch":
+                    raise ValidationError("Invalid Amazon Secret Key. The Secret Access Key does not match the Access Key ID. Please verify your credentials.")
+                raise ValidationError("Credential validation failed: %s" % cred_err)
+
+            # Credentials are valid — now check bucket access
             client = boto3.client(
                 "s3",
                 aws_access_key_id=self.amazon_access_key,
                 aws_secret_access_key=self.amazon_secret_key,
             )
-            client.head_bucket(Bucket=self.amazon_bucket_name)
-        except Exception as err:
-            message = str(err)
-            if any(token in message.lower() for token in ("accessdenied", "forbidden", "headbucket", "403")):
+            try:
+                client.head_bucket(Bucket=self.amazon_bucket_name)
+            except Exception as bucket_err:
+                code = ""
+                try:
+                    code = bucket_err.response["Error"]["Code"]
+                except Exception:
+                    pass
+                if code == "NoSuchBucket" or "404" in str(bucket_err):
+                    raise ValidationError("Bucket '%s' does not exist. Please verify the bucket name." % self.amazon_bucket_name)
                 return self.open_amazon_permission_helper()
-            raise ValidationError(f"Connection failed: {err}")
+
+        except ValidationError:
+            raise
+        except Exception as err:
+            raise ValidationError("Connection failed: %s" % err)
         return self._notify("Amazon S3 connection successful.")
 
     def open_amazon_permission_helper(self):
@@ -266,16 +298,20 @@ class CloudConnectorRule(models.Model):
 
     def test_google_drive_connection(self):
         self.ensure_one()
-        service = self.env["ir.attachment"]._get_drive_service(self)
-        if not service:
-            raise ValidationError("Google Drive connection failed.")
         try:
+            service = self.env["ir.attachment"]._get_drive_service(self)
+            if not service:
+                raise ValidationError("Google Drive connection failed. Check that Client ID, Client Secret and Refresh Token are configured.")
             service.files().list(pageSize=1, fields="files(id)").execute()
-        except HttpError as err:
-            message = getattr(err, "content", b"").decode("utf-8", "ignore")
-            if "accessNotConfigured" in message or "Google Drive API has not been used" in message:
-                raise ValidationError("Enable the Google Drive API for this Google project, then retry.")
-            raise ValidationError(f"Google Drive connection failed: {err}")
+        except ValidationError:
+            raise
+        except Exception as e:
+            msg = str(e)
+            if "invalid_client" in msg:
+                raise ValidationError("Invalid OAuth client: The Client ID or Client Secret was not found in Google Cloud Console. Please verify your credentials.")
+            if "invalid_grant" in msg:
+                raise ValidationError("Invalid or expired Refresh Token. Please re-authorize Google Drive.")
+            raise ValidationError("Google Drive connection failed: %s" % msg)
         return self._notify("Google Drive connection successful.")
 
     def google_drive_authorize(self):

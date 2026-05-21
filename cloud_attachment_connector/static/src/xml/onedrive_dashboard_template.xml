@@ -1,103 +1,156 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--    Dashboard template    -->
 <templates id="template" xml:space="preserve">
-    <t t-name="microsoft_onedrive_connector.OneDriveDashboard" owl="1">
-        <div class="o_onedrive_dashboard">
-            <div class="o_onedrive_dashboard_header">
-                <h2>Microsoft OneDrive Dashboard</h2>
-                <div class="o_onedrive_dashboard_actions" t-if="state.configured">
-                    <button class="btn btn-primary" t-on-click="refreshFiles">
-                        <i class="fa fa-refresh"/> Refresh
-                    </button>
-                    <button class="btn btn-secondary" t-on-click="upload"
-                            t-att-disabled="state.uploading ? true : undefined">
-                        <i class="fa fa-upload"/> Upload
-                    </button>
-                </div>
-            </div>
-
-            <div t-if="state.uploading" class="o_onedrive_upload_progress alert alert-info mt-3 mb-0">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <strong t-esc="state.uploadFileName"/>
-                    <span class="badge text-bg-primary"><t t-esc="state.uploadProgress"/>%</span>
-                </div>
-                <div class="progress" style="height: 8px;">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated"
-                         role="progressbar"
-                         t-att-style="'width: ' + state.uploadProgress + '%;'"/>
-                </div>
-                <small class="text-muted d-block mt-1" t-esc="state.uploadStatus"/>
-            </div>
-
-            <input type="search"
-                   class="o_onedrive_header_search_input"
-                   placeholder="Search Files"
-                   t-on-input="onSearchInput"/>
-
-            <div class="o_onedrive_dashboard_content">
-                <div t-if="state.loading" class="o_onedrive_loading">
-                    <i class="fa fa-spinner fa-spin"/> Loading files from OneDrive...
-                </div>
-
-                <div t-if="state.error" class="o_onedrive_error alert alert-danger">
-                    <i class="fa fa-exclamation-triangle"/>
-                    <strong>Error:</strong> <t t-esc="state.error"/>
-                </div>
-
-                <div t-if="state.configured &amp;&amp; !state.loading &amp;&amp; !state.error" class="o_onedrive_files">
-                    <div t-if="state.files.length === 0" class="o_onedrive_empty">
-                        <i class="fa fa-cloud-upload fa-3x text-muted"/>
-                        <h3>No files found in OneDrive</h3>
-                        <p>Upload files with <strong>Upload</strong> or via chatter; ensure the connector is configured.</p>
+    <t t-name="microsoft_onedrive_connector.OneDriveDashboard">
+        <section class="onedrive_dashboard_main_section"
+                 id="main_section_manager">
+            <div class="onedrive_hero">
+                <div class="onedrive_hero_brand">
+                    <img class="onedrive_brand_logo"
+                         src="/cloud_attachment_connector/static/description/onedrive.jpeg"
+                         alt="OneDrive"/>
+                    <div>
+                        <div class="onedrive_eyebrow">OneDrive Connector</div>
+                        <p class="onedrive_hero_subtitle">
+                            Manage synced files, chatter uploads, and manual OneDrive assets.
+                        </p>
                     </div>
+                </div>
 
-                    <div t-if="state.files.length > 0" class="o_onedrive_files_list">
-                        <table class="table table-hover o_onedrive_files_table">
-                            <thead>
-                                <tr>
-                                    <th>File Name</th>
-                                    <th>Type</th>
-                                    <th>Related Record</th>
-                                    <th>Size</th>
-                                    <th>Modified</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr t-foreach="filteredFiles" t-as="file" t-key="file.unique_key">
-                                    <td>
-                                        <i t-att-class="'fa ' + getFileIcon(file)"/>
-                                        <t t-esc="file.name"/>
+                <div class="onedrive_hero_stats">
+                    <div class="onedrive_hero_stat">
+                        <span class="onedrive_hero_stat_label">Files</span>
+                        <span class="onedrive_hero_stat_value"><t t-esc="dashboardStats.total"/></span>
+                    </div>
+                    <div class="onedrive_hero_stat">
+                        <span class="onedrive_hero_stat_label">Linked</span>
+                        <span class="onedrive_hero_stat_value"><t t-esc="dashboardStats.chatter"/></span>
+                    </div>
+                    <div class="onedrive_hero_stat">
+                        <span class="onedrive_hero_stat_label">Manual</span>
+                        <span class="onedrive_hero_stat_value"><t t-esc="dashboardStats.manual"/></span>
+                    </div>
+                    <div class="onedrive_hero_stat">
+                        <span class="onedrive_hero_stat_label">Storage</span>
+                        <span class="onedrive_hero_stat_value"><t t-esc="dashboardStats.totalSize"/></span>
+                    </div>
+                </div>
+
+                <div class="onedrive_header_actions">
+                    <input class="btn onedrive_refresh" type="button" value="Refresh"
+                           id="onedrive_refresh" t-on-click="refreshFiles"
+                           t-att-disabled="state.loading || state.uploading ? true : undefined"/>
+                    <input class="btn onedrive_upload" type="button" value="Upload"
+                           id="onedrive_upload" t-on-click="upload"
+                           t-att-disabled="state.loading || state.uploading ? true : undefined"/>
+                </div>
+            </div>
+
+            <div class="onedrive_upload_progress" t-if="state.uploading">
+                <div class="onedrive_upload_progress_header">
+                    <div>
+                        <div class="onedrive_upload_progress_label">Uploading now</div>
+                        <div class="onedrive_upload_progress_name">
+                            <t t-esc="state.uploadFileName"/>
+                        </div>
+                    </div>
+                    <div class="onedrive_upload_progress_pct">
+                        <t t-esc="state.uploadProgress"/>%
+                    </div>
+                </div>
+                <div class="progress onedrive_upload_progress_bar_shell">
+                    <div class="progress-bar onedrive_upload_progress_bar"
+                         role="progressbar"
+                         t-att-style="'width: ' + state.uploadProgress + '%;'"
+                         t-att-aria-valuenow="state.uploadProgress"
+                         aria-valuemin="0"
+                         aria-valuemax="100">
+                    </div>
+                </div>
+                <div class="onedrive_upload_progress_status">
+                    <t t-esc="state.uploadStatus"/>
+                    <button class="btn btn-sm btn-danger ml-2" t-on-click="abortUpload">Cancel</button>
+                </div>
+            </div>
+
+            <div class="onedrive_dashboard_controls">
+                <input type="search" class="onedrive_header-search-input"
+                       placeholder="Search Files" t-on-input="onSearchInput"/>
+                
+                <div class="onedrive_pager ms-auto" t-if="pagerProps.total > 0">
+                    <span class="onedrive_pager_value">
+                        <t t-esc="pagerProps.start"/>-<t t-esc="pagerProps.end"/> / <t t-esc="pagerProps.total"/>
+                    </span>
+                    <div class="btn-group onedrive_pager_buttons ms-2">
+                        <button type="button" class="btn btn-outline-secondary onedrive_pager_prev"
+                                t-att-disabled="!pagerProps.hasPrevious"
+                                t-on-click="prevPage">
+                            <i class="fa fa-chevron-left"/>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary onedrive_pager_next"
+                                t-att-disabled="!pagerProps.hasNext"
+                                t-on-click="nextPage">
+                            <i class="fa fa-chevron-right"/>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="onedrive_content">
+                <div class="onedrive_table_shell">
+                    <table class="table table-hover onedrive_files_table" id="files_table">
+                        <thead class="table-dark">
+                            <tr>
+                                <th class="sort-number" style="text-align:center;"
+                                    scope="col" t-on-click="sortNumber">SL NO:
+                                </th>
+                                <th class="sort-name" scope="col"
+                                    t-on-click="sortName">Name</th>
+                                <th scope="col">Type</th>
+                                <th scope="col">Related Record</th>
+                                <th scope="col">Last Modified</th>
+                                <th scope="col">Size</th>
+                            </tr>
+                        </thead>
+                        <tbody class="onedrive_files">
+                            <t t-foreach="fileRows" t-as="file" t-key="file.sequence">
+                                <tr class="file_row table-secondary">
+                                    <td scope="row" style="text-align:center;">
+                                        <t t-esc="file.displaySequence"/>
                                     </td>
                                     <td>
-                                        <span class="badge text-bg-secondary" t-esc="file.type"/>
+                                        <a class="file_name" t-att-href="file.url" target="_blank">
+                                            <t t-esc="file.displayName"/>
+                                        </a>
+                                        <button class="btn btn-sm text-dark p-0 border-0 bg-transparent ms-2"
+                                                t-on-click="() => downloadFile(file)">
+                                            <i class="fa fa-download download_file"/>
+                                        </button>
                                     </td>
+                                    <td><t t-esc="file.type.toUpperCase()"/></td>
                                     <td>
-                                        <t t-if="file.res_model and file.res_id">
+                                        <t t-if="file.resModel and file.resId">
                                             <button type="button"
                                                     class="btn btn-link p-0 text-muted align-baseline related_record_link"
                                                     t-on-click="() => openRelatedRecord(file)">
-                                                <t t-esc="file.related_record"/>
+                                                <t t-esc="file.resName"/>
                                             </button>
                                         </t>
+                                        <t t-elif="file.resName">
+                                            <small class="text-muted"><t t-esc="file.resName"/></small>
+                                        </t>
                                         <t t-else="">
-                                            <t t-esc="file.related_record || 'Manual Upload'"/>
+                                            <small class="text-muted">-</small>
                                         </t>
                                     </td>
-                                    <td t-esc="formatFileSize(file.size)"/>
-                                    <td t-esc="formatDate(file.modified)"/>
-                                    <td>
-                                        <button class="btn btn-sm btn-primary"
-                                                t-on-click="() => downloadFile(file)"
-                                                t-if="file.id">
-                                            <i class="fa fa-download"/> Download
-                                        </button>
-                                    </td>
+                                    <td><t t-esc="file.lastModifiedDisplay"/></td>
+                                    <td><t t-esc="file.size"/></td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            </t>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-        </div>
+        </section>
     </t>
 </templates>

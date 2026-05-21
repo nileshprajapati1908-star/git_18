@@ -69,43 +69,4 @@
         </field>
     </record>
 
-    <!-- Action for OneDrive Attachments -->
-    <record id="action_onedrive_attachments" model="ir.actions.act_window">
-        <field name="name">OneDrive Attachments</field>
-        <field name="res_model">ir.attachment</field>
-        <field name="view_mode">list,form</field>
-        <field name="search_view_id" ref="view_onedrive_attachment_search"/>
-        <field name="domain">[('is_onedrive_attachment', '=', True)]</field>
-        <field name="context">{'default_is_onedrive_attachment': True}</field>
-        <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">
-                No OneDrive attachments found
-            </p>
-            <p>
-                Attachments uploaded to Microsoft OneDrive will appear here.
-                Enable auto-upload in settings to automatically upload chatter attachments.
-            </p>
-        </field>
-    </record>
-
-    <record id="action_onedrive_attachments_tree_view" model="ir.actions.act_window.view">
-        <field name="sequence" eval="1"/>
-        <field name="view_mode">list</field>
-        <field name="view_id" ref="view_onedrive_attachment_tree"/>
-        <field name="act_window_id" ref="action_onedrive_attachments"/>
-    </record>
-
-    <record id="action_onedrive_attachments_form_view" model="ir.actions.act_window.view">
-        <field name="sequence" eval="2"/>
-        <field name="view_mode">form</field>
-        <field name="view_id" ref="view_onedrive_attachment_form"/>
-        <field name="act_window_id" ref="action_onedrive_attachments"/>
-    </record>
-
-    <!-- Menu item for OneDrive Attachments -->
-    <menuitem id="menu_onedrive_attachments"
-              name="OneDrive Attachments"
-              parent="onedrive_connector_menu_root"
-              action="action_onedrive_attachments"
-              sequence="10"/>
 </odoo>

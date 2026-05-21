@@ -45,6 +45,7 @@
                            t-att-disabled="state.loading || state.uploading ? true : undefined"/>
                 </div>
             </div>
+
             <div class="google_drive_upload_progress" t-if="state.uploading">
                 <div class="google_drive_upload_progress_header">
                     <div>
@@ -68,84 +69,86 @@
                 </div>
                 <div class="google_drive_upload_progress_status">
                     <t t-esc="state.uploadStatus"/>
+                    <button class="btn btn-sm btn-danger ml-2" t-on-click="abortUpload">Cancel</button>
                 </div>
             </div>
-            <input type="search" class="google_drive_header-search-input"
-                   placeholder="Search Files" t-on-input="onSearchInput"/>
+
+            <div class="google_drive_dashboard_controls">
+                <input type="search" class="google_drive_header-search-input"
+                       placeholder="Search Files" t-on-input="onSearchInput"/>
+                
+                <div class="google_drive_pager ms-auto" t-if="pagerProps.total > 0">
+                    <span class="google_drive_pager_value">
+                        <t t-esc="pagerProps.start"/>-<t t-esc="pagerProps.end"/> / <t t-esc="pagerProps.total"/>
+                    </span>
+                    <div class="btn-group google_drive_pager_buttons ms-2">
+                        <button type="button" class="btn btn-outline-secondary google_drive_pager_prev"
+                                t-att-disabled="!pagerProps.hasPrevious"
+                                t-on-click="prevPage">
+                            <i class="fa fa-chevron-left"/>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary google_drive_pager_next"
+                                t-att-disabled="!pagerProps.hasNext"
+                                t-on-click="nextPage">
+                            <i class="fa fa-chevron-right"/>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div class="google_drive_content">
-                <t t-if="state.files and state.files.length > 0">
-                    <div class="google_drive_table_shell" t-if="fileRows and fileRows.length > 0">
-                        <table class="table table-hover google_drive_files_table" id="files_table">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th class="sort-number" style="text-align:center;"
-                                        scope="col" t-on-click="sortNumber">SL NO:
-                                    </th>
-                                    <th class="sort-name" scope="col"
-                                        t-on-click="sortName">Name</th>
-                                    <th scope="col">Type</th>
-                                    <th scope="col">Related Record</th>
-                                    <th scope="col">Last Modified</th>
-                                    <th scope="col">Size</th>
+                <div class="google_drive_table_shell">
+                    <table class="table table-hover google_drive_files_table" id="files_table">
+                        <thead class="table-dark">
+                            <tr>
+                                <th class="sort-number" style="text-align:center;"
+                                    scope="col" t-on-click="sortNumber">SL NO:
+                                </th>
+                                <th class="sort-name" scope="col"
+                                    t-on-click="sortName">Name</th>
+                                <th scope="col">Type</th>
+                                <th scope="col">Related Record</th>
+                                <th scope="col">Last Modified</th>
+                                <th scope="col">Size</th>
+                            </tr>
+                        </thead>
+                        <tbody class="google_drive_files">
+                            <t t-foreach="fileRows" t-as="file" t-key="file.sequence">
+                                <tr class="file_row table-secondary">
+                                    <td scope="row" style="text-align:center;">
+                                        <t t-esc="file.displaySequence"/>
+                                    </td>
+                                    <td>
+                                        <a class="file_name" t-att-href="file.url" target="_blank">
+                                            <t t-esc="file.displayName"/>
+                                        </a>
+                                        <a t-att-href="file.url" target="_blank" class="text-dark">
+                                            <i class="fa fa-download download_file"/>
+                                        </a>
+                                    </td>
+                                    <td><t t-esc="file.type.toUpperCase()"/></td>
+                                    <td>
+                                        <t t-if="file.resModel and file.resId">
+                                            <button type="button"
+                                                    class="btn btn-link p-0 text-muted align-baseline related_record_link"
+                                                    t-on-click="() => openRelatedRecord(file)">
+                                                <t t-esc="file.resName"/>
+                                            </button>
+                                        </t>
+                                        <t t-elif="file.resName">
+                                            <small class="text-muted"><t t-esc="file.resName"/></small>
+                                        </t>
+                                        <t t-else="">
+                                            <small class="text-muted">-</small>
+                                        </t>
+                                    </td>
+                                    <td><t t-esc="file.lastModifiedDisplay"/></td>
+                                    <td><t t-esc="file.size"/></td>
                                 </tr>
-                            </thead>
-                            <tbody class="google_drive_files">
-                                <t t-foreach="fileRows" t-as="file" t-key="file.sequence">
-                                    <tr class="file_row table-secondary">
-                                        <td scope="row" style="text-align:center;">
-                                            <t t-esc="file.displaySequence"/>
-                                        </td>
-                                        <td>
-                                            <a class="file_name" t-att-href="file.url" target="_blank">
-                                                <t t-esc="file.displayName"/>
-                                            </a>
-                                            <a t-att-href="file.url" target="_blank" class="text-dark">
-                                                <i class="fa fa-download download_file"/>
-                                            </a>
-                                        </td>
-                                        <td><t t-esc="file.type.toUpperCase()"/></td>
-                                        <td>
-                                            <t t-if="file.resModel and file.resId">
-                                                <button type="button"
-                                                        class="btn btn-link p-0 text-muted align-baseline related_record_link"
-                                                        t-on-click="() => openRelatedRecord(file)">
-                                                    <t t-esc="file.resName"/>
-                                                </button>
-                                            </t>
-                                            <t t-elif="file.resName">
-                                                <small class="text-muted"><t t-esc="file.resName"/></small>
-                                            </t>
-                                            <t t-else="">
-                                                <small class="text-muted">-</small>
-                                            </t>
-                                        </td>
-                                        <td><t t-esc="file.lastModifiedDisplay"/></td>
-                                        <td><t t-esc="file.size"/></td>
-                                    </tr>
-                                </t>
-                            </tbody>
-                        </table>
-                    </div>
-                    <t t-else="">
-                        <div class="google_drive_empty_state">
-                            <div class="google_drive_empty_icon">
-                                <i class="fa fa-google"></i>
-                            </div>
-                            <h4>No files found in Google Drive</h4>
-                            <p>Upload a file to start building your synced workspace.</p>
-                            <button class="btn btn-primary mt-3" t-on-click="upload">
-                                <i class="fa fa-upload"></i>
-                                Upload Your First File
-                            </button>
-                        </div>
-                    </t>
-                </t>
-                <t t-else="">
-                    <div class="text-center text-muted py-5">
-                        <i class="fa fa-cloud fa-3x mb-3"></i>
-                        <p>No files found. Upload files to get started.</p>
-                    </div>
-                </t>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
     </t>

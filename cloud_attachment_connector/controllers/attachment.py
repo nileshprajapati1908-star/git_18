@@ -7,10 +7,11 @@ from werkzeug.utils import redirect
 
 from odoo import _, http
 from odoo.addons.mail.controllers.thread import ThreadController
-from odoo.addons.mail.models.discuss.mail_guest import add_guest_to_context
 from odoo.addons.mail.tools.discuss import Store
+from odoo.addons.mail.models.discuss.mail_guest import add_guest_to_context
 from odoo.exceptions import AccessError, UserError
 from odoo.http import content_disposition, request
+from odoo.tools import consteq
 
 _logger = logging.getLogger(__name__)
 _LARGE_FILE_FALLBACK_LIMIT = 100 * 1024 * 1024
@@ -31,6 +32,14 @@ def _get_routed_rule(env, thread_model):
 
 
 class CloudAttachmentController(ThreadController):
+    def _get_thread_with_access_for_post(self, thread_model, thread_id, **kwargs):
+        thread_id = int(thread_id or 0)
+        if not thread_model or not thread_id:
+            return request.env[thread_model] if thread_model else False
+        model = request.env[thread_model]
+        mode = model._get_mail_message_access([thread_id], "create", model_name=thread_model)
+        return model._get_thread_with_access(thread_id, mode=mode, **kwargs)
+
     @http.route("/mail/attachment/delete", methods=["POST"], type="json", auth="public")
     @add_guest_to_context
     def mail_attachment_delete(self, attachment_id, access_token=None):
@@ -38,10 +47,28 @@ class CloudAttachmentController(ThreadController):
         if not attachment:
             request.env.user._bus_send("ir.attachment/delete", {"id": attachment_id})
             return
-        if not attachment._has_attachments_ownership([access_token]):
-            request.env.user._bus_send("ir.attachment/delete", {"id": attachment_id})
+        attachment_message = request.env["mail.message"].sudo().search(
+            [("attachment_ids", "in", attachment.ids)], limit=1
+        )
+        message = request.env["mail.message"].sudo(False)._get_with_access(
+            attachment_message.id, "create"
+        )
+        if not request.env.user.share:
+            attachment._delete_and_notify(message)
+            return
+        attachment_sudo = attachment.sudo()
+        if message:
+            if not message.is_current_user_or_guest_author:
+                raise NotFound()
+        elif (
+            not access_token
+            or not attachment_sudo.access_token
+            or not consteq(access_token, attachment_sudo.access_token)
+            or attachment_sudo.res_model != "mail.compose.message"
+            or attachment_sudo.res_id != 0
+        ):
             raise NotFound()
-        attachment.sudo().unlink()
+        attachment_sudo._delete_and_notify(message)
 
     @http.route("/amazon_s3/attachment/<int:attachment_id>", type="http", auth="user")
     def amazon_s3_attachment(self, attachment_id, **kwargs):
@@ -97,24 +124,32 @@ class CloudAttachmentController(ThreadController):
         return redirect(result["url"], code=302)
 
     def _handle_mail_attachment_upload(self, ufile, thread_id, thread_model, is_pending=False, **kwargs):
-        post_access = request.env[thread_model].sudo()._get_mail_message_access(int(thread_id), "create")
-        thread = request.env[thread_model]._get_thread_with_access(int(thread_id), mode=post_access, **kwargs)
+        thread = self._get_thread_with_access_for_post(thread_model, thread_id, **kwargs)
         if not thread:
             raise NotFound()
         is_manual = not thread_model or not thread_id or thread_id == "0"
-        is_pending_upload = is_pending and is_pending != "false"
         vals = {
             "name": ufile.filename,
-            "res_id": 0 if is_manual or is_pending_upload else int(thread_id),
-            "res_model": False if is_manual else ("mail.compose.message" if is_pending_upload else thread_model),
+            "res_id": 0 if is_manual else int(thread_id),
+            "res_model": False if is_manual else thread_model,
             "mimetype": ufile.content_type,
             "file_size": self._get_file_size(ufile),
         }
         if not is_manual:
             vals.update({"chatter_thread_model": thread_model, "chatter_thread_id": int(thread_id)})
+            if is_pending and is_pending != "false":
+                vals.update({"res_id": 0, "res_model": "mail.compose.message"})
 
         file_size = vals["file_size"]
+        file_data = None
         connector = _get_routed_connector(request.env, thread_model)
+
+        def _get_file_data():
+            nonlocal file_data
+            if file_data is None:
+                ufile.stream.seek(0, os.SEEK_SET)
+                file_data = ufile.read()
+            return file_data
 
         try:
             if connector:
@@ -122,13 +157,8 @@ class CloudAttachmentController(ThreadController):
                 uploaded = False
                 if connector == "google":
                     try:
-                        ufile.stream.seek(0, os.SEEK_SET)
-                        result = attachment._upload_to_drive(
-                            ufile.stream,
-                            vals["name"],
-                            rule=_get_routed_rule(request.env, thread_model),
-                            file_size=file_size,
-                        )
+                        file_data = _get_file_data()
+                        result = attachment._upload_to_drive(file_data, vals["name"], rule=_get_routed_rule(request.env, thread_model))
                         vals.update({"is_drive_attachment": True, "drive_file_id": result["drive_file_id"],
                                      "drive_url": result["drive_url"]})
                         uploaded = True
@@ -136,7 +166,7 @@ class CloudAttachmentController(ThreadController):
                         _logger.error("Cloud upload failed for %s to Google: %s", vals.get("name"), err, exc_info=True)
                 if connector == "amazon" and not uploaded:
                     try:
-                        file_data = ufile.read()
+                        file_data = _get_file_data()
                         result = attachment._upload_to_s3(file_data, vals["name"], rule=_get_routed_rule(request.env, thread_model))
                         vals.update(
                             {"is_s3_attachment": True, "s3_key": result["s3_key"], "s3_url": result.get("s3_url")})
@@ -145,7 +175,7 @@ class CloudAttachmentController(ThreadController):
                         _logger.error("Cloud upload failed for %s to Amazon: %s", vals.get("name"), err, exc_info=True)
                 if connector == "onedrive" and not uploaded:
                     try:
-                        file_data = ufile.read()
+                        file_data = _get_file_data()
                         result = attachment._upload_to_onedrive(file_data, vals["name"], rule=_get_routed_rule(request.env, thread_model))
                         vals.update({"is_onedrive_attachment": True, "onedrive_item_id": result["onedrive_item_id"],
                                      "onedrive_url": result["onedrive_url"]})
@@ -162,23 +192,20 @@ class CloudAttachmentController(ThreadController):
                     if file_size > _LARGE_FILE_FALLBACK_LIMIT:
                         return request.make_json_response(
                             {"error": _("File is too large to store locally after cloud upload failed.")}, status=400)
-                    ufile.stream.seek(0, os.SEEK_SET)
-                    vals["raw"] = ufile.read()
+                    vals["raw"] = _get_file_data()
             else:
                 if file_size > _LARGE_FILE_FALLBACK_LIMIT:
                     return request.make_json_response({"error": _("File is too large to store locally.")}, status=400)
-                ufile.stream.seek(0, os.SEEK_SET)
-                vals["raw"] = ufile.read()
+                vals["raw"] = _get_file_data()
         except Exception as err:
             _logger.error("Cloud upload failed: %s", err, exc_info=True)
             if file_size > _LARGE_FILE_FALLBACK_LIMIT:
                 return request.make_json_response({"error": _("Cloud upload failed for large file: %s") % err},
                                                   status=400)
-            ufile.stream.seek(0, os.SEEK_SET)
-            vals["raw"] = ufile.read()
+            vals["raw"] = _get_file_data()
 
         try:
-            attachment = request.env["ir.attachment"].create(vals)
+            attachment = request.env["ir.attachment"].sudo().create(vals)
             attachment._post_add_create(**kwargs)
             res = {
                 "data": {
@@ -189,6 +216,9 @@ class CloudAttachmentController(ThreadController):
             }
         except AccessError:
             res = {"error": _("You are not allowed to upload an attachment here.")}
+        except Exception as error:
+            _logger.exception("Failed to upload chatter attachment")
+            return request.make_json_response({"error": str(error)}, status=500)
         return request.make_json_response(res)
 
     @http.route("/cloud_attachment_connector/amazon/chatter_attachment/finalize", methods=["POST"], type="http", auth="public", csrf=False)
@@ -206,8 +236,7 @@ class CloudAttachmentController(ThreadController):
         if not s3_key:
             return request.make_json_response({"error": _("Missing S3 key.")}, status=400)
 
-        post_access = request.env[thread_model].sudo()._get_mail_message_access(int(thread_id), "create")
-        thread = request.env[thread_model]._get_thread_with_access(int(thread_id), mode=post_access, **kwargs)
+        thread = self._get_thread_with_access_for_post(thread_model, thread_id, **kwargs)
         if not thread:
             raise NotFound()
         if multipart_upload_id:
@@ -237,8 +266,8 @@ class CloudAttachmentController(ThreadController):
         file_name = payload.get("file_name") or "attachment"
         vals = {
             "name": file_name,
-            "res_id": 0 if is_manual_upload or (is_pending and is_pending != "false") else int(thread_id),
-            "res_model": False if is_manual_upload else ("mail.compose.message" if is_pending and is_pending != "false" else thread_model),
+            "res_id": 0 if is_manual_upload else int(thread_id),
+            "res_model": False if is_manual_upload else thread_model,
             "mimetype": payload.get("mimetype") or "application/octet-stream",
             "file_size": int(payload.get("file_size") or 0),
             "is_s3_attachment": True,
@@ -246,11 +275,13 @@ class CloudAttachmentController(ThreadController):
             "raw": False,
             "db_datas": False,
         }
+        if not is_manual_upload and is_pending and is_pending != "false":
+            vals.update({"res_id": 0, "res_model": "mail.compose.message"})
         if not is_manual_upload:
             vals.update({"chatter_thread_model": thread_model, "chatter_thread_id": int(thread_id)})
 
         try:
-            attachment = request.env["ir.attachment"].create(vals)
+            attachment = request.env["ir.attachment"].sudo().create(vals)
             post_kwargs = dict(kwargs)
             post_kwargs.update({"thread_id": thread_id, "thread_model": thread_model, "is_pending": is_pending})
             if activity_id:
@@ -270,6 +301,9 @@ class CloudAttachmentController(ThreadController):
             }
         except AccessError:
             res = {"error": _("You are not allowed to upload an attachment here.")}
+        except Exception as error:
+            _logger.exception("Failed to finalize S3 chatter attachment")
+            return request.make_json_response({"error": str(error)}, status=500)
         return request.make_json_response(res)
 
     @http.route("/cloud_attachment_connector/mail/attachment/upload", methods=["POST"], type="http", auth="public", max_content_length=5 * 1024 * 1024 * 1024, csrf=False)
@@ -296,8 +330,7 @@ class CloudAttachmentController(ThreadController):
         if not onedrive_item_id:
             return request.make_json_response({"error": _("Missing OneDrive item ID.")}, status=400)
 
-        post_access = request.env[thread_model].sudo()._get_mail_message_access(int(thread_id), "create")
-        thread = request.env[thread_model]._get_thread_with_access(int(thread_id), mode=post_access, **kwargs)
+        thread = self._get_thread_with_access_for_post(thread_model, thread_id, **kwargs)
         if not thread:
             raise NotFound()
 
@@ -305,8 +338,8 @@ class CloudAttachmentController(ThreadController):
         file_name = payload.get("file_name") or "attachment"
         vals = {
             "name": file_name,
-            "res_id": 0 if is_manual_upload or (is_pending and is_pending != "false") else int(thread_id),
-            "res_model": False if is_manual_upload else ("mail.compose.message" if is_pending and is_pending != "false" else thread_model),
+            "res_id": 0 if is_manual_upload else int(thread_id),
+            "res_model": False if is_manual_upload else thread_model,
             "mimetype": payload.get("mimetype") or "application/octet-stream",
             "file_size": int(payload.get("file_size") or 0),
             "is_onedrive_attachment": True,
@@ -315,11 +348,13 @@ class CloudAttachmentController(ThreadController):
             "raw": False,
             "db_datas": False,
         }
+        if not is_manual_upload and is_pending and is_pending != "false":
+            vals.update({"res_id": 0, "res_model": "mail.compose.message"})
         if not is_manual_upload:
             vals.update({"chatter_thread_model": thread_model, "chatter_thread_id": int(thread_id)})
 
         try:
-            attachment = request.env["ir.attachment"].create(vals)
+            attachment = request.env["ir.attachment"].sudo().create(vals)
             post_kwargs = dict(kwargs)
             post_kwargs.update({"thread_id": thread_id, "thread_model": thread_model, "is_pending": is_pending})
             if activity_id:
@@ -340,6 +375,9 @@ class CloudAttachmentController(ThreadController):
 
         except AccessError:
             res = {"error": _("You are not allowed to upload an attachment here.")}
+        except Exception as error:
+            _logger.exception("Failed to finalize OneDrive chatter attachment")
+            return request.make_json_response({"error": str(error)}, status=500)
         return request.make_json_response(res)
 
     def _get_file_size(self, ufile):

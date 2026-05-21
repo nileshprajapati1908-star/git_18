@@ -1,10 +1,24 @@
-/** @odoo-module **/
-
-import { Component } from "@odoo/owl";
+import { Component, useState, onWillStart } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { session } from "@web/session";
 
 const PART_SIZE = 4 * 1024 * 1024;
+
+function formatFileType(mimetype, filename) {
+    if (filename) {
+        const ext = filename.split(".").pop();
+        if (ext && ext.length <= 5 && ext !== filename) return ext.toUpperCase();
+    }
+    const sub = ((mimetype || "").split("/")[1] || mimetype || "").toLowerCase();
+    const map = {
+        "vnd.openxmlformats-officedocument.wordprocessingml.document": "DOCX",
+        "vnd.openxmlformats-officedocument.spreadsheetml.sheet": "XLSX",
+        "vnd.openxmlformats-officedocument.presentationml.presentation": "PPTX",
+        "vnd.ms-excel": "XLS", "vnd.ms-powerpoint": "PPT",
+        "plain": "TXT", "x-zip-compressed": "ZIP", "octet-stream": "BIN",
+    };
+    return (map[sub] || sub.split(".").pop() || sub).toUpperCase();
+}
 
 function formatBytes(bytes) {
     if (!bytes || bytes === 0) {
@@ -25,7 +39,7 @@ class OneDriveDashboard extends Component {
         this.upload = this.upload.bind(this);
         this.refreshFiles = this.refreshFiles.bind(this);
         this.downloadFile = this.downloadFile.bind(this);
-        this.state = {
+        this.state = useState({
             configured: true,
             missingSettings: [],
             setupSteps: [],
@@ -38,8 +52,26 @@ class OneDriveDashboard extends Component {
             uploadProgress: 0,
             uploadFileName: "",
             uploadStatus: "",
-        };
-        this.loadDashboardState();
+            currentPage: 1,
+            pageSize: 40,
+        });
+        this.currentXHR = null;
+
+        onWillStart(async () => {
+            await this.loadDashboardState();
+        });
+    }
+
+    abortUpload() {
+        if (this.currentXHR) {
+            this.currentXHR.abort();
+            this.currentXHR = null;
+            this.state.uploading = false;
+            this.state.uploadProgress = 0;
+            this.state.uploadFileName = "";
+            this.state.uploadStatus = "";
+            this.notification.add("Upload aborted by user.", { type: "warning" });
+        }
     }
 
     async loadDashboardState() {
@@ -55,12 +87,9 @@ class OneDriveDashboard extends Component {
                 this.state.files = [];
                 this.state.error = null;
                 this.state.loading = false;
-                this.render();
             }
         } catch (error) {
             this.state.error = error.message || "Failed to load dashboard state";
-        } finally {
-            this.render();
         }
     }
 
@@ -82,7 +111,6 @@ class OneDriveDashboard extends Component {
             this.state.error = error.message || "Failed to load files";
         } finally {
             this.state.loading = false;
-            this.render();
         }
     }
 
@@ -107,7 +135,7 @@ class OneDriveDashboard extends Component {
 
     onSearchInput(ev) {
         this.state.search = (ev.target.value || "").toLowerCase();
-        this.render();
+        this.state.currentPage = 1;
     }
 
     get filteredFiles() {
@@ -115,20 +143,86 @@ class OneDriveDashboard extends Component {
         if (!search) {
             return this.state.files;
         }
-        return this.state.files.filter((file) =>
-            (file.name || "").toLowerCase().includes(search) ||
-            (file.related_record || "Manual Upload").toLowerCase().includes(search)
-        );
+        return this.state.files.filter((file) => {
+            const name = (file.name || "").toLowerCase();
+            const relatedRecord = (file.related_record || "Manual Upload").toLowerCase();
+            const type = (file.type || "").toLowerCase();
+            const modified = this.formatDate(file.modified).toLowerCase();
+            const size = this.formatFileSize(file.size).toLowerCase();
+
+            return name.includes(search) ||
+                   relatedRecord.includes(search) ||
+                   type.includes(search) ||
+                   modified.includes(search) ||
+                   size.includes(search);
+        });
+    }
+
+    get pagerProps() {
+        const total = this.filteredFiles.length;
+        const start = (this.state.currentPage - 1) * this.state.pageSize + 1;
+        const end = Math.min(this.state.currentPage * this.state.pageSize, total);
+        return {
+            start,
+            end,
+            total,
+            hasPrevious: this.state.currentPage > 1,
+            hasNext: end < total,
+        };
+    }
+
+    prevPage() {
+        if (this.state.currentPage > 1) {
+            this.state.currentPage--;
+        }
+    }
+
+    nextPage() {
+        if (this.pagerProps.hasNext) {
+            this.state.currentPage++;
+        }
+    }
+
+    get dashboardStats() {
+        const total = this.state.files.length;
+        const chatter = this.state.files.filter((file) => file.related_record && file.related_record !== "Manual Upload").length;
+        const manual = Math.max(total - chatter, 0);
+        const totalSize = this.state.files.reduce((sum, file) => sum + (Number(file.size) || 0), 0);
+
+        return {
+            total,
+            chatter,
+            manual,
+            totalSize: this.formatFileSize(totalSize),
+        };
+    }
+
+    get fileRows() {
+        const start = (this.state.currentPage - 1) * this.state.pageSize;
+        const end = start + this.state.pageSize;
+        return this.filteredFiles.slice(start, end).map((file, index) => ({
+            sequence: start + index + 1,
+            displaySequence: start + index + 1,
+            displayName: file.name,
+            url: file.url || "#",
+            type: formatFileType(file.type, file.name),
+            resModel: file.res_model || "",
+            resId: file.res_id || "",
+            resName: file.related_record || "",
+            lastModifiedDisplay: this.formatDate(file.modified),
+            size: this.formatFileSize(file.size),
+            id: file.id
+        }));
     }
 
     openRelatedRecord(file) {
-        if (!file?.res_model || !file?.res_id) {
+        if (!file?.resModel || !file?.resId) {
             return;
         }
         this.actionService.doAction({
             type: "ir.actions.act_window",
-            res_model: file.res_model,
-            res_id: Number(file.res_id),
+            res_model: file.resModel,
+            res_id: Number(file.resId),
             views: [[false, "form"]],
             target: "current",
         });
@@ -182,20 +276,17 @@ class OneDriveDashboard extends Component {
             this.state.uploadProgress = 0;
             this.state.uploadFileName = files.length > 1 ? `${files.length} files` : files[0].name;
             this.state.uploadStatus = "Preparing…";
-            this.render();
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
                 this.state.uploadFileName = file.name;
                 this.state.uploadStatus =
                     files.length > 1 ? `Uploading ${i + 1} of ${files.length}` : "Uploading…";
-                this.render();
                 await this._uploadSingleFile(file, i + 1, files.length);
             }
 
             this.state.uploadProgress = 100;
             this.state.uploadStatus = "Complete";
-            this.render();
             this.notification.add(
                 files.length > 1 ? `${files.length} files uploaded.` : "File uploaded.",
                 { type: "success" }
@@ -208,7 +299,6 @@ class OneDriveDashboard extends Component {
             this.state.uploadProgress = 0;
             this.state.uploadFileName = "";
             this.state.uploadStatus = "";
-            this.render();
         }
     }
 
@@ -258,7 +348,6 @@ class OneDriveDashboard extends Component {
                 totalCount > 1
                     ? `Uploading ${currentIndex} of ${totalCount} (${formatBytes(loaded)} / ${formatBytes(file.size)})`
                     : `${formatBytes(loaded)} / ${formatBytes(file.size)}`;
-            this.render();
         };
 
         const uploadChunk = async (partNumber) => {
@@ -266,6 +355,7 @@ class OneDriveDashboard extends Component {
             const end = Math.min(file.size, start + PART_SIZE);
             const blob = file.slice(start, end);
             const xhr = new XMLHttpRequest();
+            this.currentXHR = xhr;
             const result = await new Promise((resolve, reject) => {
                 xhr.open("PUT", uploadUrl);
                 xhr.setRequestHeader("Content-Range", `bytes ${start}-${end - 1}/${file.size}`);
@@ -312,7 +402,7 @@ class OneDriveDashboard extends Component {
 
     async downloadFile(file) {
         try {
-            if (file?.url) {
+            if (file?.url && file.url !== "#") {
                 window.open(file.url, "_blank", "noopener");
                 return;
             }
@@ -337,8 +427,19 @@ class OneDriveDashboard extends Component {
         await this.loadFiles();
         this.notification.add("Files refreshed", { type: "success" });
     }
+
+    sortNumber() {
+        const sorted = [...this.state.files].sort((a, b) => a.sequence - b.sequence);
+        this.state.files = sorted;
+    }
+
+    sortName() {
+        const sorted = [...this.state.files].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+        this.state.files = sorted;
+    }
 }
 
 OneDriveDashboard.template = "microsoft_onedrive_connector.OneDriveDashboard";
 
 export default OneDriveDashboard;
+

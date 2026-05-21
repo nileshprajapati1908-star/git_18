@@ -41,8 +41,8 @@
             'cloud_attachment_connector/static/src/js/onedrive.js',
             'cloud_attachment_connector/static/src/js/onedrive_authorize.js',
             'cloud_attachment_connector/static/src/js/chatter_download_progress.js',
-            'cloud_attachment_connector/static/src/js/attachment_uploader_patch.js',
             'cloud_attachment_connector/static/src/js/attachment_model_patch.js',
+            'cloud_attachment_connector/static/src/js/attachment_uploader_patch.js',
             'cloud_attachment_connector/static/src/js/amazon.js',
             'cloud_attachment_connector/static/src/js/google_drive.js',
             'cloud_attachment_connector/static/src/js/google_drive_dashboard_client_action.js',
@@ -64,7 +64,6 @@
         ],
         'mail.assets_messaging': [
             'cloud_attachment_connector/static/src/js/attachment_uploader_patch.js',
-            'cloud_attachment_connector/static/src/js/attachment_model_patch.js',
             'cloud_attachment_connector/static/src/xml/attachment_uploader_patch.xml',
             'cloud_attachment_connector/static/src/scss/chatter_download_progress.scss',
         ],

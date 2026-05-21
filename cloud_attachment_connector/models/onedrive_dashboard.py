@@ -13,7 +13,7 @@ python_logger = _logger
 
 
 def _strip_optional_rpc_record_ids(positional_args):
-    """Odoo 19 ``call_kw`` still forwards the web client's leading id list for ``@api.model`` RPC."""
+    """Odoo 18 ``call_kw`` may forward the web client's leading id list for ``@api.model`` RPC."""
     args = list(positional_args)
     if args and isinstance(args[0], (list, tuple)):
         args.pop(0)

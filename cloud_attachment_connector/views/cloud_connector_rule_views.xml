@@ -69,13 +69,13 @@
                         <page string="Credentials" name="amazon" icon="fa-cloud">
                             <group col="1">
                                 <group string="Access Credentials" col="2">
-                                    <field name="amazon_access_key"
+                                    <field name="amazon_access_key" readonly="state == 'confirmed'"
                                            placeholder="AKIAIOSFODNN7EXAMPLE"/>
-                                    <field name="amazon_secret_key"
+                                    <field name="amazon_secret_key" readonly="state == 'confirmed'"
                                            password="True"
                                            placeholder="Enter secret key"/>
-                                    <field name="amazon_bucket_name"/>
-                                    <field name="amazon_region" />
+                                    <field name="amazon_bucket_name" readonly="state == 'confirmed'"/>
+                                    <field name="amazon_region"  readonly="state == 'confirmed'"/>
 
 
                                 </group>
@@ -150,9 +150,9 @@
 
                             <group col="1">
                                 <group string="OAuth Credentials" col="2">
-                                    <field name="google_drive_client_id"
+                                    <field name="google_drive_client_id" readonly="state == 'confirmed'"
                                            placeholder="xxxx.apps.googleusercontent.com"/>
-                                    <field name="google_drive_client_secret"
+                                    <field name="google_drive_client_secret" readonly="state == 'confirmed'"
                                            password="True"
                                            placeholder="Enter client secret"/>
                                     <field name="google_drive_refresh_token"
@@ -224,11 +224,11 @@
 
                             <group col="1">
                                 <group string="Azure App Credentials">
-                                    <field name="onedrive_tenant_id"
+                                    <field name="onedrive_tenant_id" readonly="state == 'confirmed'"
                                            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
-                                    <field name="onedrive_client_id"
+                                    <field name="onedrive_client_id" readonly="state == 'confirmed'"
                                            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
-                                    <field name="onedrive_folder_path"
+                                    <field name="onedrive_folder_path" readonly="state == 'confirmed'"
                                            placeholder="/Documents/Odoo Attachments"/>
                                 </group>
                                 <group string="Authorization" col="2">

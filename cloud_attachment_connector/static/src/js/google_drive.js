@@ -5,6 +5,22 @@ import { onWillStart, useState } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { session } from "@web/session";
 
+function formatFileType(mimetype, filename) {
+    if (filename) {
+        const ext = filename.split(".").pop();
+        if (ext && ext.length <= 5 && ext !== filename) return ext.toUpperCase();
+    }
+    const sub = ((mimetype || "").split("/")[1] || mimetype || "").toLowerCase();
+    const map = {
+        "vnd.openxmlformats-officedocument.wordprocessingml.document": "DOCX",
+        "vnd.openxmlformats-officedocument.spreadsheetml.sheet": "XLSX",
+        "vnd.openxmlformats-officedocument.presentationml.presentation": "PPTX",
+        "vnd.ms-excel": "XLS", "vnd.ms-powerpoint": "PPT",
+        "plain": "TXT", "x-zip-compressed": "ZIP", "octet-stream": "BIN",
+    };
+    return (map[sub] || sub.split(".").pop() || sub).toUpperCase();
+}
+
 export class GoogleDriveDashboard extends Component {
     setup() {
         this.orm = useService("orm");
@@ -21,21 +37,51 @@ export class GoogleDriveDashboard extends Component {
             uploadStatus: "",
             configMissing: false,
             apiError: null,
+            currentPage: 1,
+            pageSize: 40,
         });
+        this.currentXHR = null;
 
         onWillStart(async () => {
-            await this.fetchData();
+            await this.fetchData(false);
         });
     }
 
     get fileRows() {
-        return this.state.filteredFiles.map(file => ({
+        const start = (this.state.currentPage - 1) * this.state.pageSize;
+        const end = start + this.state.pageSize;
+        return this.state.filteredFiles.slice(start, end).map(file => ({
             ...file,
             displayName: file.name,
             displaySequence: file.sequence,
             size: this.formatFileSize(file.size),
             lastModifiedDisplay: this.formatDate(file.lastModified),
         }));
+    }
+
+    get pagerProps() {
+        const total = this.state.filteredFiles.length;
+        const start = (this.state.currentPage - 1) * this.state.pageSize + 1;
+        const end = Math.min(this.state.currentPage * this.state.pageSize, total);
+        return {
+            start,
+            end,
+            total,
+            hasPrevious: this.state.currentPage > 1,
+            hasNext: end < total,
+        };
+    }
+
+    prevPage() {
+        if (this.state.currentPage > 1) {
+            this.state.currentPage--;
+        }
+    }
+
+    nextPage() {
+        if (this.pagerProps.hasNext) {
+            this.state.currentPage++;
+        }
     }
 
     get dashboardStats() {
@@ -53,7 +99,7 @@ export class GoogleDriveDashboard extends Component {
     }
 
     upload() {
-        if (this.state.apiError || this.state.loading) {
+        if (this.state.apiError || this.state.configMissing || this.state.loading) {
             this.displayNotification({
                 type: 'danger',
                 title: 'Configuration Required',
@@ -74,7 +120,22 @@ export class GoogleDriveDashboard extends Component {
         if (this.state.loading) {
             return;
         }
-        await this.fetchData();
+        await this.fetchData(true);
+    }
+
+    abortUpload() {
+        if (this.currentXHR) {
+            this.currentXHR.abort();
+            this.currentXHR = null;
+            this.state.uploading = false;
+            this.state.uploadProgress = 0;
+            this.state.uploadFileName = "";
+            this.state.uploadStatus = "";
+            this.displayNotification({
+                type: 'warning',
+                message: 'Upload aborted by user.',
+            });
+        }
     }
 
     sortNumber() {
@@ -87,7 +148,7 @@ export class GoogleDriveDashboard extends Component {
         this.state.filteredFiles = sorted;
     }
 
-    async fetchData() {
+    async fetchData(loadRemote = false) {
         this.state.loading = true;
         this.state.apiError = null;
         this.state.configMissing = false;
@@ -114,7 +175,7 @@ export class GoogleDriveDashboard extends Component {
                     sequence: index + 1,
                     name: attachment.name,
                     url: attachment.drive_url,
-                    type: (attachment.mimetype || "").toLowerCase(),
+                    type: formatFileType(attachment.mimetype, attachment.name),
                     lastModified: attachment.create_date,
                     size: Number(attachment.drive_file_size || attachment.file_size || 0),
                     source: (attachment.res_model && attachment.res_id) ? "chatter" : "drive_manual",
@@ -127,27 +188,29 @@ export class GoogleDriveDashboard extends Component {
                 console.warn("Failed to fetch Google Drive attachments:", error);
             }
 
-            try {
-                const result = await this.orm.call("google_drive.dashboard", "google_drive_view_files", [[]]);
-                if (result && Array.isArray(result) && result.length > 0) {
-                    allFiles = allFiles.concat(result
-                        .filter((file) => !driveAttachmentIds.has(file.id))
-                        .map((file, index) => ({
-                            sequence: allFiles.length + index + 1,
-                            name: file.name,
-                            url: file.webViewLink,
-                            type: (file.mimeType || "").toLowerCase(),
-                            lastModified: file.modifiedTime,
-                            size: file.size,
-                            source: "drive_manual",
-                            resModel: "",
-                            resId: "",
-                            resName: "",
-                            isFolder: file.is_folder || false,
-                        })));
+            if (loadRemote) {
+                try {
+                    const result = await this.orm.call("google_drive.dashboard", "google_drive_view_files", [[]]);
+                    if (result && Array.isArray(result) && result.length > 0) {
+                        allFiles = allFiles.concat(result
+                            .filter((file) => !driveAttachmentIds.has(file.id))
+                            .map((file, index) => ({
+                                sequence: allFiles.length + index + 1,
+                                name: file.name,
+                                url: file.webViewLink,
+                                type: formatFileType(file.mimeType, file.name),
+                                lastModified: file.modifiedTime,
+                                size: file.size,
+                                source: "drive_manual",
+                                resModel: "",
+                                resId: "",
+                                resName: "",
+                                isFolder: file.is_folder || false,
+                            })));
+                    }
+                } catch (error) {
+                    console.warn("Failed to fetch Google Drive files:", error);
                 }
-            } catch (error) {
-                console.warn("Failed to fetch Google Drive files:", error);
             }
 
             this.state.files = allFiles;
@@ -168,11 +231,21 @@ export class GoogleDriveDashboard extends Component {
     onSearchInput(ev) {
         const searchTerm = ev.target.value.toLowerCase();
         this.state.search = searchTerm;
-        this.state.filteredFiles = this.state.files.filter((file) =>
-            !searchTerm ||
-            (file.name || "").toLowerCase().includes(searchTerm) ||
-            (file.resName || "").toLowerCase().includes(searchTerm)
-        );
+        this.state.filteredFiles = this.state.files.filter((file) => {
+            if (!searchTerm) return true;
+            const name = (file.name || "").toLowerCase();
+            const resName = (file.resName || "").toLowerCase();
+            const type = (file.type || "").toLowerCase();
+            const lastModified = this.formatDate(file.lastModified).toLowerCase();
+            const size = this.formatFileSize(file.size).toLowerCase();
+
+            return name.includes(searchTerm) ||
+                   resName.includes(searchTerm) ||
+                   type.includes(searchTerm) ||
+                   lastModified.includes(searchTerm) ||
+                   size.includes(searchTerm);
+        });
+        this.state.currentPage = 1;
     }
 
     openRelatedRecord(file) {
@@ -304,6 +377,7 @@ export class GoogleDriveDashboard extends Component {
             const end = Math.min(file.size, offset + chunkSize);
             const chunk = file.slice(offset, end);
             const xhr = new XMLHttpRequest();
+            this.currentXHR = xhr;
             xhr.open("PUT", sessionUrl);
             xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
             xhr.setRequestHeader("Content-Range", `bytes ${offset}-${end - 1}/${file.size}`);
