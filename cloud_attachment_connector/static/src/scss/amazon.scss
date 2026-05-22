@@ -6,11 +6,11 @@
     padding: 12px 24px;
     border-radius: 16px;
     background:
-        radial-gradient(circle at top left, rgba(255, 153, 0, 0.15), transparent 34%),
-        radial-gradient(circle at right center, rgba(35, 47, 62, 0.14), transparent 28%),
-        linear-gradient(135deg, #16191f 0%, #232f3e 48%, #37475a 100%);
+        radial-gradient(circle at top left, rgba(66, 133, 244, 0.18), transparent 34%),
+        radial-gradient(circle at right center, rgba(52, 168, 83, 0.14), transparent 28%),
+        linear-gradient(135deg, #0f172a 0%, #1e293b 48%, #334155 100%);
     color: #fff;
-    box-shadow: 0 12px 30px rgba(22, 25, 31, 0.18);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
     margin-bottom: 12px;
 }
 
@@ -86,12 +86,12 @@
 }
 
 .amazon_upload {
-    background: linear-gradient(135deg, #ff9900 0%, #e47911 100%);
+    background: linear-gradient(135deg, #4285f4 0%, #2a63db 100%);
     color: white;
     border-radius: 999px;
     width: 90px;
     border: none;
-    box-shadow: 0 8px 16px rgba(255, 153, 0, 0.22);
+    box-shadow: 0 8px 16px rgba(66, 133, 244, 0.22);
     font-weight: bold;
     font-size: 11px;
     height: 34px;
@@ -113,9 +113,9 @@
     margin: 0 0 12px;
     padding: 12px 16px;
     border-radius: 14px;
-    background: linear-gradient(180deg, rgba(255, 153, 0, 0.08), rgba(255, 255, 255, 0.92));
-    border: 1px solid rgba(255, 153, 0, 0.14);
-    box-shadow: 0 8px 24px rgba(22, 25, 31, 0.06);
+    background: linear-gradient(180deg, rgba(66, 133, 244, 0.08), rgba(255, 255, 255, 0.92));
+    border: 1px solid rgba(66, 133, 244, 0.14);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
 .amazon_s3_upload_progress_header {
@@ -144,7 +144,7 @@
 .amazon_s3_upload_progress_pct {
     font-size: 16px;
     font-weight: 700;
-    color: #ff9900;
+    color: #4285f4;
     flex: 0 0 auto;
 }
 
@@ -157,7 +157,7 @@
 }
 
 .amazon_s3_upload_progress_bar {
-    background: linear-gradient(90deg, #ff9900 0%, #ffc46d 100%);
+    background: linear-gradient(90deg, #4285f4 0%, #34a853 48%, #fbbc05 100%);
     border-radius: 999px;
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
     transition: width 0.42s cubic-bezier(0.22, 1, 0.36, 1);
@@ -187,12 +187,12 @@
     .btn {
         padding: 4px 10px;
         font-size: 12px;
-        border-color: rgba(255, 153, 0, 0.4);
-        color: #ff9900;
+        border-color: rgba(66, 133, 244, 0.4);
+        color: #4285f4;
 
         &:hover:not(:disabled) {
-            background-color: #ff9900;
-            border-color: #ff9900;
+            background-color: #4285f4;
+            border-color: #4285f4;
             color: white;
         }
 
@@ -209,17 +209,17 @@
     width: 100%;
     max-width: 380px;
     outline: none;
-    border: 1px solid #ff9900;
+    border: 1px solid #4285f4;
     font-size: 14px;
-    box-shadow: 0 0 0 3px rgba(255, 153, 0, 0.18), 0 8px 22px rgba(15, 23, 42, 0.12);
+    box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.18), 0 8px 22px rgba(15, 23, 42, 0.12);
     margin: 0;
     padding: 0 14px;
     background: #fff;
 }
 
 .amazon_header-search-input:focus {
-    border-color: #ff9900;
-    box-shadow: 0 0 0 4px rgba(255, 153, 0, 0.24), 0 8px 22px rgba(15, 23, 42, 0.12);
+    border-color: #4285f4;
+    box-shadow: 0 0 0 4px rgba(66, 133, 244, 0.24), 0 8px 22px rgba(15, 23, 42, 0.12);
 }
 
 .files_select {
@@ -236,7 +236,7 @@
 .amazon_dashboard_main_section {
     padding: 16px;
     background:
-        radial-gradient(circle at top left, rgba(255, 153, 0, 0.06), transparent 30%),
+        radial-gradient(circle at top left, rgba(66, 133, 244, 0.06), transparent 30%),
         linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
     min-height: 100vh;
 }
@@ -261,28 +261,28 @@
         border-radius: 10px;
     }
     &::-webkit-scrollbar-thumb {
-        background: #ff9900;
+        background: #4285f4;
         border-radius: 10px;
     }
     &::-webkit-scrollbar-thumb:hover {
-        background: #e47911;
+        background: #2a63db;
     }
 }
 
 .amazon_s3_files_table {
     margin-bottom: 0;
-    
+
     thead th {
         position: sticky;
         top: 0;
         z-index: 10;
-        background-color: #232f3e !important;
+        background-color: #1e293b !important;
         border: none;
     }
 }
 
 .file_name {
-    color: #ff9900;
+    color: #4285f4;
     text-decoration: none;
     font-weight: 500;
 }
@@ -315,14 +315,14 @@
         height: 2px;
         bottom: -2px;
         left: 0;
-        background-color: #ff9900;
+        background-color: #4285f4;
         visibility: hidden;
         transform: scaleX(0);
         transition: all 0.3s ease-in-out;
     }
 
     &:hover {
-        color: #ff9900 !important;
+        color: #4285f4 !important;
         &::after {
             visibility: visible;
             transform: scaleX(1);

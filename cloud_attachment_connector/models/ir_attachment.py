@@ -256,7 +256,9 @@ class IrAttachment(models.Model):
             try:
                 download = self.env["onedrive.dashboard"].generate_download_url(self.onedrive_item_id)
                 if download.get("success") and download.get("url"):
-                    if wants_download or is_image:
+                    # Only buffer data for inline images; redirect downloads directly to avoid
+                    # loading large files into memory and hitting server timeouts.
+                    if is_image and not wants_download:
                         data = self._get_onedrive_content(download["url"])
                         if data is not None:
                             return Stream(type="data", data=data, mimetype=self.mimetype, download_name=self.name or "attachment", size=len(data), max_age=0)
@@ -271,7 +273,9 @@ class IrAttachment(models.Model):
                     self._get_rule_for_attachment(self, "google"),
                 )
                 if url:
-                    if wants_download or is_image:
+                    # Only buffer data for inline images; redirect downloads directly to avoid
+                    # loading large files into memory and hitting server timeouts.
+                    if is_image and not wants_download:
                         data = self._get_drive_content(self.drive_file_id)
                         if data is not None:
                             return Stream(type="data", data=data, mimetype=self.mimetype, download_name=self.name or "attachment", size=len(data), max_age=0)
@@ -282,10 +286,6 @@ class IrAttachment(models.Model):
             try:
                 client, bucket = self._get_s3_client(self._get_rule_for_attachment(self, "amazon"))
                 if client and bucket:
-                    if wants_download or is_image:
-                        obj = client.get_object(Bucket=bucket, Key=self.s3_key)
-                        data = obj["Body"].read()
-                        return Stream(type="data", data=data, mimetype=self.mimetype, download_name=self.name or self.s3_key.split("/")[-1], size=len(data), max_age=0)
                     url = client.generate_presigned_url(
                         ClientMethod="get_object",
                         Params={
@@ -296,6 +296,12 @@ class IrAttachment(models.Model):
                         },
                         ExpiresIn=3600,
                     )
+                    # Only buffer data for inline images; redirect downloads directly to avoid
+                    # loading large files into memory and hitting server timeouts.
+                    if is_image and not wants_download:
+                        obj = client.get_object(Bucket=bucket, Key=self.s3_key)
+                        data = obj["Body"].read()
+                        return Stream(type="data", data=data, mimetype=self.mimetype, download_name=self.name or self.s3_key.split("/")[-1], size=len(data), max_age=0)
                     return Stream(type="url", url=url, mimetype=self.mimetype, download_name=self.name or "attachment", size=int(self.file_size or 0), max_age=0)
             except Exception:
                 pass
@@ -368,8 +374,12 @@ class IrAttachment(models.Model):
         try:
             import boto3
 
-            client = boto3.client("s3", aws_access_key_id=access_key, aws_secret_access_key=access_secret)
-            region = client.get_bucket_location(Bucket=bucket_name).get("LocationConstraint") or "us-east-1"
+            region = rule.amazon_region if rule and rule.amazon_region else None
+            if not region:
+                # Detect region once via API and persist it to avoid this round-trip on every request.
+                tmp = boto3.client("s3", aws_access_key_id=access_key, aws_secret_access_key=access_secret)
+                region = tmp.get_bucket_location(Bucket=bucket_name).get("LocationConstraint") or "us-east-1"
+                rule.sudo().write({"amazon_region": region})
             client = boto3.client(
                 "s3",
                 region_name=region,
