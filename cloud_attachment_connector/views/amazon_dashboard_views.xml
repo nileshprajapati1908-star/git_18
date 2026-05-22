@@ -19,7 +19,7 @@
     </record>
     <menuitem id="amazon_s3_connector_menu_root"
               name="Amazon S3"
-              web_icon="amazon_s3_connector,static/description/icon.png"
+              web_icon="cloud_attachment_connector,static/description/amazon_icon.png"
               action="amazon_dashboard_action"
               active="False"/>
     <menuitem id="amazon_s3_connector_dashboard_menu"
