@@ -109,8 +109,10 @@ export class AmazonDashboard extends Component {
                     size: formatBytes(attachment.s3_file_size || attachment.file_size || 0),
                     source: (attachment.res_model && attachment.res_id) ? "chatter" : "s3_manual",
                     resModel: attachment.res_model || "",
-                    resId: attachment.res_id || "",
-                    resName: attachment.related_record_name || ""
+                    resId: attachment.res_id || 0,
+                    resName: attachment.related_record_name || "",
+                    chatterModel: attachment.chatter_thread_model || "",
+                    chatterId: attachment.chatter_thread_id || 0,
                 }));
                 allFiles = allFiles.concat(formattedAttachments);
             }
@@ -247,17 +249,23 @@ export class AmazonDashboard extends Component {
     }
 
     openRelatedRecord(file) {
-        if (!file?.resModel || !file?.resId) {
-            return;
-        }
-        this.actionService.doAction({
-            type: "ir.actions.act_window",
-            res_model: file.resModel,
-            res_id: Number(file.resId),
-            views: [[false, "form"]],
-            target: "current",
-        });
+    const model = (file?.resModel === "mail.compose.message" || !file?.resModel)
+        ? file?.chatterModel
+        : file?.resModel;
+    const id = (file?.resModel === "mail.compose.message" || !file?.resId)
+        ? file?.chatterId
+        : file?.resId;
+    if (!model || !id) {
+        return;
     }
+    this.actionService.doAction({
+        type: "ir.actions.act_window",
+        res_model: model,
+        res_id: Number(id),
+        views: [[false, "form"]],
+        target: "current",
+    });
+}
 
     upload() {
         if (this.state.uploading) {

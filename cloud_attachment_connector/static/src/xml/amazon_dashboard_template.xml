@@ -128,20 +128,17 @@
                                     </td>
                                     <td><t t-esc="file.type.toUpperCase()"/></td>
                                     <td>
-                                        <t t-if="file.resModel and file.resId">
-                                            <button type="button"
-                                                    class="btn btn-link p-0 text-muted align-baseline related_record_link"
-                                                    t-on-click="() => openRelatedRecord(file)">
-                                                <t t-esc="file.resName"/>
-                                            </button>
-                                        </t>
-                                        <t t-elif="file.resName">
-                                            <small class="text-muted"><t t-esc="file.resName"/></small>
-                                        </t>
-                                        <t t-else="">
-                                            <small class="text-muted">-</small>
-                                        </t>
-                                    </td>
+    <t t-if="file.resName and file.resName != 'Manual Upload'">
+        <button type="button"
+                class="btn btn-link p-0 text-muted align-baseline related_record_link"
+                t-on-click="() => openRelatedRecord(file)">
+            <t t-esc="file.resName"/>
+        </button>
+    </t>
+    <t t-else="">
+        <small class="text-muted">-</small>
+    </t>
+</td>
                                     <td><t t-esc="file.lastModifiedDisplay"/></td>
                                     <td><t t-esc="file.size"/></td>
                                 </tr>
