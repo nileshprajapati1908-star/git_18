@@ -20,6 +20,7 @@
     'company': 'Aktiv Software',
     'maintainer': 'Aktiv Software',
     'website': "https://www.aktivsoftware.com",
+    'icon': '/cloud_attachment_connector/static/description/icon.png',
     'depends': ['base_setup', 'mail', 'web'],
     'data': [
         'security/ir.model.access.csv',
@@ -68,6 +69,11 @@
             'cloud_attachment_connector/static/src/scss/chatter_download_progress.scss',
         ],
     },
+
+    "images": [
+            "static/description/banner.jpg",
+        ],
+
     'license': "OPL-1",
     'installable': True,
     'auto_install': False,
